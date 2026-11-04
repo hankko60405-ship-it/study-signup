@@ -313,19 +313,20 @@
             <div class="fields">
               <label class="field"><span>姓名 Name</span><input type="text" id="name" autocomplete="name" placeholder="例：柯承翰" required></label>
               <label class="field"><span>學號 Student ID</span><input type="text" id="studentId" autocapitalize="characters" placeholder="例：1133B025" required></label>
-              <label class="field"><span>科系 Department</span><span class="select-wrap"><select id="dept" required>
+              <label class="field full"><span>科系 Department</span><span class="select-wrap"><select id="dept" required>
                 <option value="" disabled selected hidden>請選擇科系</option>
                 <option>商業設計管理系</option>
                 <option>創意科技與產品設計系</option>
                 <option>數位多媒體設計系</option>
               </select></span></label>
-              <label class="field"><span>年級 Year</span><span class="select-wrap"><select id="grade" required>
-                <option value="" disabled selected hidden>請選擇年級</option>
-                <option>一年級</option>
-                <option>二年級</option>
-                <option>三年級</option>
-                <option>四年級</option>
-                <option>延修生</option>
+              <label class="field"><span>學制 Program</span><span class="select-wrap"><select id="program" required>
+                <option value="" disabled selected hidden>請選擇學制</option>
+                <option>四技</option>
+                <option>二技</option>
+                <option>二專</option>
+              </select></span></label>
+              <label class="field"><span>年級 Year</span><span class="select-wrap"><select id="grade" required disabled>
+                <option value="" disabled selected hidden>請先選學制</option>
               </select></span></label>
               <label class="field"><span>學校 Email</span><input type="email" id="email" autocomplete="email" inputmode="email" placeholder="例：1133B025@ntub.edu.tw" required></label>
               <label class="field"><span>手機 Phone</span><input type="tel" id="phone" autocomplete="tel" inputmode="tel" placeholder="09xx-xxx-xxx" required></label>
@@ -462,7 +463,7 @@
     if (state.step === 1) return $('eligible').checked && $('consent').checked;
     if (state.step === 2) return !!state.group;
     if (state.step === 3) return !!state.slot;
-    return ['name', 'studentId', 'dept', 'grade', 'email', 'phone'].every(id => $(id).value.trim());
+    return ['name', 'studentId', 'dept', 'program', 'grade', 'email', 'phone'].every(id => $(id).value.trim());
   }
 
   function renderGroups() {
@@ -552,7 +553,20 @@
   // ---------- 操作 ----------
   $('consent').addEventListener('change', render);
   $('eligible').addEventListener('change', render);
-  ['name', 'studentId', 'dept', 'grade', 'email', 'phone'].forEach(id => ['input', 'change'].forEach(ev => $(id).addEventListener(ev, () => {
+  // 年級選項依學制變化（要和 Code.gs 的 PROGRAMS 一致）
+  const GRADES_BY_PROGRAM = {
+    '四技': ['一年級', '二年級', '三年級', '四年級', '延修生'],
+    '二技': ['一年級', '二年級', '延修生'],
+    '二專': ['一年級', '二年級', '延修生'],
+  };
+  $('program').addEventListener('change', () => {
+    const list = GRADES_BY_PROGRAM[$('program').value] || [];
+    const keep = list.includes($('grade').value) ? $('grade').value : '';
+    $('grade').innerHTML = '<option value="" disabled hidden>請選擇年級</option>' + list.map(g => `<option>${g}</option>`).join('');
+    $('grade').value = keep;
+    $('grade').disabled = !list.length;
+  });
+  ['name', 'studentId', 'dept', 'program', 'grade', 'email', 'phone'].forEach(id => ['input', 'change'].forEach(ev => $(id).addEventListener(ev, () => {
     $('next').disabled = !canProceed() || state.sending;
   })));
   $('back').addEventListener('click', () => go(state.step - 1));
@@ -562,7 +576,7 @@
 
     const form = {
       consent: $('consent').checked, eligible: $('eligible').checked, group: state.group, slotId: state.slot.id,
-      name: $('name').value, studentId: $('studentId').value, dept: $('dept').value, grade: $('grade').value,
+      name: $('name').value, studentId: $('studentId').value, dept: $('dept').value, program: $('program').value, grade: $('grade').value,
       email: $('email').value, phone: $('phone').value,
     };
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) { $('msg').textContent = 'Email 格式不正確。'; return; }
