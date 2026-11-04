@@ -1,10 +1,11 @@
-/* 左上角三條線選單：在「施測報名」「基本資料表」「研究問卷」之間切換。
+/* 左上角三條線選單：在「施測報名」「查詢報名」「基本資料表」「研究問卷」之間切換。
    每一頁的 .rail 第一個 .tag 會被換成選單按鈕。要新增頁面，改下面的 PAGES 就好。 */
 (function () {
   const PAGES = [
     { href: 'index.html', key: 'book', no: '01', title: '施測報名', sub: '選擇施測日期與時段' },
-    { href: 'survey.html?f=basic', key: 'basic', no: '02', title: '基本資料表', sub: '施測當天，任務開始前填寫' },
-    { href: 'survey.html?f=post', key: 'post', no: '03', title: '研究問卷', sub: '創意任務完成後填寫，約 5 分鐘' },
+    { href: 'lookup.html', key: 'lookup', no: '02', title: '查詢報名', sub: '用學號和 Email 查報名編號與時間' },
+    { href: 'survey.html?f=basic', key: 'basic', no: '03', title: '基本資料表', sub: '施測當天，任務開始前填寫' },
+    { href: 'survey.html?f=post', key: 'post', no: '04', title: '研究問卷', sub: '創意任務完成後填寫，約 5 分鐘' },
   ];
   const current = document.body.dataset.page || 'book';
 

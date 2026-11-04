@@ -112,6 +112,9 @@
   .consent-text li { margin-bottom: 4px; }
   .doc-link { align-self: flex-start; display: inline-flex; gap: 6px; align-items: center; padding: 8px 14px; border-radius: 999px; border: 1px solid var(--line); color: var(--ink); text-decoration: none; font: 400 12px/1 var(--small); letter-spacing: .06em; }
   .doc-link:hover { border-color: var(--ink); }
+  .lookup-link { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 4px; padding: 14px 16px; border-radius: 12px;
+    background: var(--chip); color: var(--ink); text-decoration: none; font-size: 14px; }
+  .lookup-link:hover { background: var(--line); }
   .check { display: flex; gap: 12px; align-items: center; cursor: pointer; padding: 4px 0; }
   .check input { appearance: none; width: 22px; height: 22px; margin: 0; border: 1.5px solid var(--faint); border-radius: 6px; display: grid; place-items: center; flex: none; cursor: pointer; }
   .check input:checked { background: var(--inverse-bg); border-color: var(--inverse-bg); }
@@ -317,6 +320,7 @@
           <a class="doc-link" href="recruitment-notice.pdf" target="_blank" rel="noopener">查看原始招募公告 PDF <span aria-hidden="true">↗</span></a>
           <label class="check"><input type="checkbox" id="eligible"><span>我符合上述參加資格。</span></label>
           <label class="check"><input type="checkbox" id="consent"><span>我已閱讀上述說明，並同意參與本研究。</span></label>
+          <a class="lookup-link" href="lookup.html"><span>已經報名過了？查詢報名編號與施測時間</span><span aria-hidden="true">→</span></a>
         </div>
       </section>
 

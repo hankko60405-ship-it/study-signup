@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>查詢報名</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,200..700&family=Noto+Sans+TC:wght@300;400;500;700&display=swap">
+<style>
+  /* 台北黑體：fonts 資料夾裡的檔案只含本頁用到的字，修改文字後缺的字會改用備用字體 */
+  @font-face {
+    font-family: "Taipei Sans TC";
+    src: local("Taipei Sans TC Beta"), local("TaipeiSansTCBeta-Regular"), url("fonts/TaipeiSansTC-Regular.woff2") format("woff2");
+    font-weight: 400; font-display: swap;
+  }
+  @font-face {
+    font-family: "Taipei Sans TC";
+    src: local("Taipei Sans TC Beta Bold"), local("TaipeiSansTCBeta-Bold"), url("fonts/TaipeiSansTC-Bold.woff2") format("woff2");
+    font-weight: 700; font-display: swap;
+  }
+  /* 版面：手機優先，一次一個步驟（同意 → 時段 → 資料；組別由系統隨機分派），底部固定「上一步／下一步」；
+     電腦版左側多一條直排大字。冷灰底、白色圓角卡片、大號細字數字。 */
+  :root {
+    --bg: #e9ebee;
+    --surface: #ffffff;
+    --ink: #111315;
+    --muted: #6b7178;
+    --faint: #a9aeb4;
+    --line: #d6d9dd;
+    --chip: #f2f3f5;
+    --inverse-bg: #111315;
+    --inverse-ink: #ffffff;
+    --danger: #c2412d;
+    --display: "Archivo", "Noto Sans TC", system-ui, sans-serif;
+    --body: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", system-ui, sans-serif;
+    --small: "Taipei Sans TC", "Noto Sans TC", "PingFang TC", system-ui, sans-serif; /* 小字標籤 */
+    --radius: 18px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0c0d0e; --surface: #17191b; --ink: #f1f2f3; --muted: #9298a0; --faint: #5a6068;
+      --line: #2a2d31; --chip: #212427; --inverse-bg: #f1f2f3; --inverse-ink: #0c0d0e; --danger: #f08a74;
+      color-scheme: dark;
+    }
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body { margin: 0; }
+  body { background: var(--bg); color: var(--ink); font: 15px/1.7 var(--body); -webkit-font-smoothing: antialiased; }
+
+  .shell { display: grid; grid-template-columns: 88px minmax(0, 1fr); min-height: 100vh; }
+
+  /* 左側直排標題列（電腦版） */
+  .rail {
+    position: sticky; top: 0; height: 100vh; border-right: 1px solid var(--line);
+    display: flex; flex-direction: column; justify-content: space-between; align-items: center; padding: 24px 0;
+  }
+  .rail .word {
+    writing-mode: vertical-rl; /* 中文直排，字保持正向、由上往下讀 */
+    font: 300 46px/1 var(--body); letter-spacing: .12em; white-space: nowrap;
+  }
+  .rail .word b { font-weight: 700; }
+  .rail .tag { font: 400 10px/1 var(--small); letter-spacing: .14em; color: var(--muted); writing-mode: vertical-rl; transform: rotate(180deg); }
+
+  .content { min-width: 0; padding: 0 max(16px, 4vw) 120px; max-width: 980px; }
+
+  /* 頂部：狀態 + 進度 */
+  .topbar {
+    display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: center; justify-content: space-between;
+    padding: 20px 0; border-bottom: 1px solid var(--line);
+    font: 400 11px/1 var(--small); letter-spacing: .12em; color: var(--muted);
+  }
+  .status { display: inline-flex; align-items: center; gap: 8px; }
+  .status::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: #3fae7a; flex: none; }
+  .status.preview { color: var(--ink); letter-spacing: .04em; }
+  .status.preview::before { background: #e0a526; }
+  .progress { display: flex; gap: 6px; }
+  .progress > span { padding: 8px 12px; border-radius: 999px; white-space: nowrap; }
+  .progress > span.on { background: var(--inverse-bg); color: var(--inverse-ink); }
+  .progress > span.done { color: var(--ink); }
+
+  /* 主標（只在第一步顯示） */
+  .hero { position: relative; padding: 56px 0 40px; overflow: hidden; }
+  .hero svg { position: absolute; right: -80px; top: -40px; width: 440px; height: 440px; color: var(--faint); pointer-events: none; }
+  .eyebrow { font: 400 11px/1 var(--small); letter-spacing: .16em; color: var(--muted); text-transform: uppercase; }
+  .hero h1 { position: relative; margin: 16px 0 20px; font: 300 clamp(40px, 7vw, 80px)/1.05 var(--body); letter-spacing: -.02em; text-wrap: balance; }
+  .meta { position: relative; display: flex; flex-wrap: wrap; gap: 8px; }
+  .pill {
+    display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 999px;
+    background: var(--surface); border: 1px solid var(--line); font: 400 12px/1 var(--small); letter-spacing: .06em;
+  }
+
+  /* 步驟卡片 */
+  .card {
+    margin-top: 24px; background: var(--surface); border-radius: var(--radius); padding: clamp(20px, 3vw, 32px);
+    display: grid; grid-template-columns: 140px minmax(0, 1fr); gap: 24px;
+  }
+  .num { font: 200 72px/.9 var(--display); font-stretch: 110%; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
+  .num small { display: block; margin-top: 12px; font: 400 10px/1.4 var(--small); letter-spacing: .14em; color: var(--muted); text-transform: uppercase; }
+  .card-body { min-width: 0; display: flex; flex-direction: column; gap: 16px; }
+  .card h2 { margin: 0; font: 500 20px/1.3 var(--body); }
+  .hint { margin: -8px 0 0; color: var(--muted); font-size: 14px; }
+
+  .consent-text { max-height: 46vh; overflow-y: auto; padding: 16px 18px; border-radius: 12px; background: var(--chip); color: var(--muted); font-size: 14px; }
+  .consent-text p { margin: 0 0 8px; }
+  .consent-text p:last-child { margin: 0; }
+  .consent-text .doc-title { font-weight: 700; color: var(--ink); font-size: 15px; }
+  .consent-text h3 { margin: 16px 0 6px; font: 700 13px/1.4 var(--body); color: var(--ink); letter-spacing: .04em; }
+  .consent-text ul { margin: 0 0 8px; padding-left: 1.2em; }
+  .consent-text li { margin-bottom: 4px; }
+  .doc-link { align-self: flex-start; display: inline-flex; gap: 6px; align-items: center; padding: 8px 14px; border-radius: 999px; border: 1px solid var(--line); color: var(--ink); text-decoration: none; font: 400 12px/1 var(--small); letter-spacing: .06em; }
+  .doc-link:hover { border-color: var(--ink); }
+  .check { display: flex; gap: 12px; align-items: center; cursor: pointer; padding: 4px 0; }
+  .check input { appearance: none; width: 22px; height: 22px; margin: 0; border: 1.5px solid var(--faint); border-radius: 6px; display: grid; place-items: center; flex: none; cursor: pointer; }
+  .check input:checked { background: var(--inverse-bg); border-color: var(--inverse-bg); }
+  /* 勾勾用 CSS 畫（線條粗細一致、圓角），不用文字的 ✓ */
+  .check input:checked::after { content: ""; width: 6px; height: 11px; border: solid var(--inverse-ink); border-width: 0 2px 2px 0; border-radius: 1px; transform: translateY(-1px) rotate(45deg); }
+
+  /* 組別卡 */
+  .groups { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+  .group {
+    font: inherit; color: var(--ink); text-align: left; cursor: pointer;
+    border: 1px solid var(--line); border-radius: 16px; background: var(--surface);
+    padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 6px; min-height: 168px;
+  }
+  .group .tagline { display: flex; justify-content: space-between; align-items: center; font: 400 10px/1 var(--small); letter-spacing: .14em; color: var(--muted); }
+  .group .letter { font: 200 96px/1 var(--display); font-stretch: 112%; margin-top: auto; }
+  .group .left { font: 400 12px/1 var(--small); letter-spacing: .06em; color: var(--muted); }
+  .group:hover:not(:disabled) { border-color: var(--ink); }
+  .group[aria-pressed="true"] { background: var(--inverse-bg); color: var(--inverse-ink); border-color: var(--inverse-bg); }
+  .group[aria-pressed="true"] .tagline, .group[aria-pressed="true"] .left { color: var(--inverse-ink); opacity: .7; }
+  .group:disabled, .slot:disabled {
+    cursor: not-allowed; color: var(--faint);
+    background: repeating-linear-gradient(135deg, transparent 0 7px, var(--chip) 7px 8px), var(--surface);
+  }
+  .box { width: 14px; height: 14px; border: 1.5px solid var(--faint); border-radius: 4px; }
+  [aria-pressed="true"] .box { background: var(--inverse-ink); border-color: var(--inverse-ink); display: grid; place-items: center; }
+  [aria-pressed="true"] .box::after { content: ""; width: 4px; height: 7px; border: solid var(--inverse-bg); border-width: 0 1.5px 1.5px 0; border-radius: 1px; transform: translateY(-1px) rotate(45deg); }
+
+  /* 日期切換 */
+  .dates { display: flex; gap: 4px; padding: 4px; border-radius: 999px; background: var(--chip); overflow-x: auto; max-width: 100%; align-self: flex-start; scrollbar-width: none; }
+  .dates::-webkit-scrollbar { display: none; }
+  .date-btn { font: 500 13px/1 var(--body); padding: 10px 16px; border: 0; border-radius: 999px; background: transparent; color: var(--muted); cursor: pointer; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .date-btn[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px rgb(0 0 0 / .08); }
+  .date-btn:disabled { opacity: .4; cursor: not-allowed; }
+
+  /* 時段卡 */
+  .times { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
+  .slot { text-align: left; cursor: pointer; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); color: var(--ink); padding: 12px 14px 14px; display: flex; flex-direction: column; gap: 10px; font: inherit; }
+  .slot-top, .slot-foot { display: flex; justify-content: space-between; align-items: center; font: 400 11px/1 var(--small); color: var(--muted); letter-spacing: .06em; }
+  .slot-time { font: 300 34px/1 var(--display); font-stretch: 105%; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+  .slot:hover:not(:disabled) { border-color: var(--ink); }
+  .slot[aria-pressed="true"] { background: var(--inverse-bg); color: var(--inverse-ink); border-color: var(--inverse-bg); }
+  .slot[aria-pressed="true"] .slot-top, .slot[aria-pressed="true"] .slot-foot { color: var(--inverse-ink); opacity: .7; }
+  .slot:disabled .slot-time { text-decoration: line-through; text-decoration-thickness: 1px; }
+
+  /* 表單 */
+  .fields { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .fields .full { grid-column: 1 / -1; }
+  .field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .field span { font: 400 10px/1 var(--small); letter-spacing: .14em; color: var(--muted); text-transform: uppercase; }
+  .field input { font: 400 16px/1.4 var(--body); padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--chip); color: var(--ink); width: 100%; }
+  .field input:focus, .field select:focus { background: var(--surface); }
+  .field select {
+    font: 400 16px/1.4 var(--body); padding: 12px 40px 12px 14px; border: 1px solid var(--line); border-radius: 12px;
+    background: var(--chip); color: var(--ink); width: 100%; appearance: none; -webkit-appearance: none; cursor: pointer;
+  }
+  .field select:invalid { color: var(--faint); }
+  .field option { color: var(--ink); }
+  .select-wrap { position: relative; }
+  .select-wrap::after { content: "▾"; position: absolute; right: 14px; top: 50%; transform: translateY(-50%); color: var(--muted); pointer-events: none; font-size: 13px; }
+  .eligibility { margin: 0; padding: 14px 16px; border-radius: 12px; border: 1px solid var(--line); display: grid; gap: 6px; font-size: 14px; }
+  .eligibility ul { margin: 0; padding-left: 1.2em; color: var(--muted); }
+  .recap { display: grid; grid-template-columns: max-content 1fr; gap: 6px 20px; padding: 14px 16px; border-radius: 12px; background: var(--chip); margin: 0; }
+  .recap dt, .complete dt { font: 400 10px/2.2 var(--small); letter-spacing: .14em; color: var(--muted); text-transform: uppercase; }
+  .recap dd, .complete dd { margin: 0; font-variant-numeric: tabular-nums; }
+  .msg { margin: 0; color: var(--danger); font-size: 14px; }
+  .msg:empty { display: none; }
+  .muted { color: var(--muted); font-size: 14px; margin: 0; }
+
+  /* 底部操作列 */
+  .actions {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 5;
+    display: flex; gap: 10px; justify-content: flex-end; align-items: center;
+    padding: 12px max(16px, env(safe-area-inset-right, 0px)) calc(12px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
+    background: color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    border-top: 1px solid var(--line);
+  }
+  .back { width: 48px; height: 48px; flex: none; border-radius: 50%; border: 1px solid var(--line); background: var(--surface); color: var(--ink); font-size: 18px; cursor: pointer; }
+  .primary {
+    display: inline-flex; align-items: center; justify-content: space-between; gap: 12px; min-width: 200px;
+    padding: 6px 6px 6px 22px; border: 0; border-radius: 999px;
+    background: var(--inverse-bg); color: var(--inverse-ink); font: 500 15px/1 var(--body); cursor: pointer;
+  }
+  .primary .arrow { width: 36px; height: 36px; border-radius: 50%; background: var(--inverse-ink); color: var(--inverse-bg); display: grid; place-items: center; font-size: 16px; }
+  .primary:disabled { opacity: .35; cursor: not-allowed; }
+
+  /* 完成畫面 */
+  .complete { margin-top: 24px; background: var(--surface); border-radius: var(--radius); padding: clamp(24px, 4vw, 48px); display: flex; flex-direction: column; gap: 24px; }
+  .code { font: 200 clamp(56px, 14vw, 128px)/.9 var(--display); font-stretch: 112%; letter-spacing: .02em; word-break: break-all; }
+  .complete dl { display: grid; grid-template-columns: max-content 1fr; gap: 10px 24px; margin: 0; }
+  .notice { padding: 14px 18px; border-radius: 12px; background: var(--chip); font-size: 14px; margin: 0; }
+
+  :focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+  @media (prefers-reduced-motion: no-preference) {
+    .slot, .group, .date-btn, .primary { transition: background .15s, color .15s, border-color .15s, opacity .15s; }
+    .card { animation: rise .25s ease-out; }
+    @keyframes rise { from { transform: translateY(8px); } to { transform: none; } }
+  }
+
+  /* 手機 */
+  @media (max-width: 760px) {
+    .shell { grid-template-columns: 1fr; }
+    .rail { position: static; height: auto; flex-direction: row; padding: 14px max(16px, 4vw); border-right: 0; border-bottom: 1px solid var(--line); }
+    .rail .word { writing-mode: horizontal-tb; font-size: 22px; letter-spacing: .08em; }
+    .rail .tag { writing-mode: horizontal-tb; transform: none; }
+    .topbar { padding: 14px 0; }
+    .progress > span { padding: 6px 9px; }
+    .progress > span:not(.on) .lbl { display: none; }
+    .hero { padding: 32px 0 8px; }
+    .hero svg { width: 280px; height: 280px; right: -120px; top: -30px; }
+    .card { grid-template-columns: 1fr; gap: 12px; margin-top: 16px; }
+    .num { font-size: 48px; display: flex; align-items: baseline; gap: 12px; }
+    .num small { margin: 0; }
+    .group { min-height: 136px; padding: 12px; }
+    .group .letter { font-size: 72px; }
+    .fields { grid-template-columns: 1fr; }
+    .times { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .primary { flex: 1; min-width: 0; }
+  }
+
+  /* ---------- 問卷頁（survey.html）專用 ---------- */
+  .code-input { font: 300 34px/1.2 var(--display) !important; letter-spacing: .12em; text-transform: uppercase; max-width: 320px; }
+  #form { display: flex; flex-direction: column; gap: 12px; }
+  .q { margin: 0; padding: 16px; border: 1px solid var(--line); border-radius: 14px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+  .q.missing { border-color: var(--danger); box-shadow: inset 0 0 0 1px var(--danger); }
+  .q-label { padding: 0; font: 500 15px/1.5 var(--body); color: var(--ink); display: flex; gap: 10px; }
+  fieldset.q { display: block; }
+  fieldset.q > legend { float: left; width: 100%; margin-bottom: 12px; } /* 讓題目文字在框內，而不是壓在框線上 */
+  fieldset.q > legend + * { clear: both; }
+  fieldset.q > * + .ends, fieldset.q > .chips + .other { margin-top: 10px; }
+  .q-no { flex: none; width: 24px; height: 24px; border-radius: 50%; background: var(--chip); display: grid; place-items: center; font: 400 12px/1 var(--display); color: var(--muted); margin-top: 1px; }
+  .q-section { margin: 14px 0 0; font: 700 14px/1.4 var(--body); letter-spacing: .04em; }
+  .q-section:first-child { margin-top: 0; }
+  .q-num { display: flex; align-items: center; gap: 10px; }
+  .q-num input, .q .other { font: 400 16px/1.4 var(--body); padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--chip); color: var(--ink); width: 120px; }
+  .q .other { width: 100%; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip, .pt { position: relative; cursor: pointer; }
+  .chip input, .pt input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+  .chip span { display: inline-block; padding: 10px 16px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); font-size: 14px; }
+  .chip input:checked + span, .pt input:checked + span { background: var(--inverse-bg); color: var(--inverse-ink); border-color: var(--inverse-bg); }
+  .chip input:focus-visible + span, .pt input:focus-visible + span { outline: 2px solid var(--ink); outline-offset: 2px; }
+  .scale { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
+  .pt span { display: grid; place-items: center; height: 46px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface); font: 300 20px/1 var(--display); font-variant-numeric: tabular-nums; }
+  .pt:hover span, .chip:hover span { border-color: var(--ink); }
+  .ends { display: flex; justify-content: space-between; font: 400 11px/1.3 var(--small); color: var(--muted); letter-spacing: .04em; }
+  .done-head { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
+  .done-mark { flex: none; width: 56px; height: 56px; border-radius: 50%; background: var(--inverse-bg); position: relative; }
+  .done-mark::after { content: ""; position: absolute; left: 50%; top: 46%; width: 12px; height: 22px; border: solid var(--inverse-ink);
+    border-width: 0 3px 3px 0; border-radius: 1.5px; transform: translate(-50%, -50%) rotate(45deg); }
+  .answered { margin-right: auto; font: 300 20px/1 var(--display); font-variant-numeric: tabular-nums; color: var(--muted); padding-left: 4px; }
+</style>
+</head>
+<body data-page="lookup">
+<div class="shell">
+  <aside class="rail">
+    <div class="tag">MENU</div>
+    <div class="word" aria-hidden="true"><b>創意發想</b>研究</div>
+    <div class="tag" id="railStep">LOOKUP</div>
+  </aside>
+
+  <div class="content">
+    <div class="topbar">
+      <span class="status" id="status">查詢報名</span>
+    </div>
+
+    <header class="hero">
+      <div class="eyebrow">Find my booking · 查詢報名</div>
+      <h1>查詢報名編號與時間</h1>
+      <div class="meta"><span class="pill">忘記報名編號或施測時間時使用</span></div>
+    </header>
+
+    <main>
+      <section class="card">
+        <div class="num">01<small>Look up</small></div>
+        <div class="card-body">
+          <h2>輸入報名時填寫的資料</h2>
+          <p class="hint">學號和 Email 都要和報名時填的一樣，才查得到。</p>
+          <form id="form" novalidate>
+            <div class="fields">
+              <label class="field"><span>學號 Student ID</span><input type="text" id="studentId" autocapitalize="characters" placeholder="例：1133B025" required></label>
+              <label class="field"><span>學校 Email</span><input type="email" id="email" autocomplete="email" inputmode="email" placeholder="例：1133B025@ntub.edu.tw" required></label>
+            </div>
+          </form>
+          <p class="msg" id="msg" role="alert"></p>
+        </div>
+      </section>
+
+      <section class="complete" id="result" hidden>
+        <div class="eyebrow">Your booking · 您的報名</div>
+        <div>
+          <div class="code" id="rCode"></div>
+          <p class="muted" style="margin-top:12px">這是您的報名編號，填寫基本資料表和研究問卷時會用到。</p>
+        </div>
+        <dl>
+          <dt>Name</dt><dd id="rName"></dd>
+          <dt>Time</dt><dd id="rTime"></dd>
+          <dt>Status</dt><dd id="rStatus"></dd>
+          <dt>Place</dt><dd id="rLocation"></dd>
+          <dt>Contact</dt><dd id="rContact"></dd>
+        </dl>
+        <p class="notice">如需更改或取消時段，請聯絡研究人員。施測內容請勿與他人討論或分享。</p>
+      </section>
+    </main>
+  </div>
+</div>
+
+<div class="actions" id="actions">
+  <button class="primary" id="next" type="button" disabled><span id="nextLabel">查詢</span><span class="arrow" aria-hidden="true">↗</span></button>
+</div>
+
+<script>
+  // 與 index.html 相同的 Apps Script 網址
+  const API_URL = 'https://script.google.com/macros/s/AKfycbzF0l-VlVxytK2UXsmRA2xX2BnW_RWkS8FmfwqrzcTRvi0psJjKTy2g24c-dVKXHwDI/exec';
+  const PREVIEW = !/^https:\/\/script\.google\.com\/.+\/exec$/.test(API_URL) || API_URL.includes('請貼上');
+  const $ = id => document.getElementById(id);
+  if (PREVIEW) { $('status').textContent = '預覽模式：尚未連接試算表'; $('status').classList.add('preview'); }
+
+  const ready = () => $('studentId').value.trim() && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test($('email').value.trim());
+  const update = () => { $('next').disabled = !ready() || busy; };
+  let busy = false;
+  ['studentId', 'email'].forEach(id => $(id).addEventListener('input', () => { $('result').hidden = true; $('msg').textContent = ''; update(); }));
+  $('form').addEventListener('submit', e => { e.preventDefault(); if (!$('next').disabled) $('next').click(); });
+  $('email').addEventListener('keydown', e => { if (e.key === 'Enter' && !$('next').disabled) $('next').click(); });
+
+  $('next').addEventListener('click', async () => {
+    busy = true; update(); $('nextLabel').textContent = '查詢中…'; $('msg').textContent = '';
+    try {
+      const body = { action: 'lookup', studentId: $('studentId').value.trim(), email: $('email').value.trim() };
+      const r = PREVIEW
+        ? { ok: true, id: 'PREVIEW', name: '（範例）', date: '2026-11-11', weekday: '三', time: '09:00–10:00', status: '已報名', location: '（施測地點）', contact: '（聯絡方式）' }
+        : await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(body) }).then(x => x.json());
+      if (!r.ok) { $('msg').textContent = r.message; $('result').hidden = true; return; }
+      $('rCode').textContent = r.id;
+      $('rName').textContent = r.name;
+      $('rTime').textContent = `${r.date}（${r.weekday}）${r.time}`;
+      $('rStatus').textContent = r.status;
+      $('rLocation').textContent = r.location;
+      $('rContact').textContent = r.contact;
+      $('result').hidden = false;
+      $('result').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } catch (e) {
+      $('msg').textContent = '查詢失敗，請檢查網路後再試一次。';
+    } finally {
+      busy = false; $('nextLabel').textContent = '查詢'; update();
+    }
+  });
+</script>
+<script src="menu.js"></script>
+</body>
+</html>
