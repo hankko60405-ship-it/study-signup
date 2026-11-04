@@ -115,7 +115,8 @@
   .check { display: flex; gap: 12px; align-items: center; cursor: pointer; padding: 4px 0; }
   .check input { appearance: none; width: 22px; height: 22px; margin: 0; border: 1.5px solid var(--faint); border-radius: 6px; display: grid; place-items: center; flex: none; cursor: pointer; }
   .check input:checked { background: var(--inverse-bg); border-color: var(--inverse-bg); }
-  .check input:checked::after { content: "✓"; color: var(--inverse-ink); font-size: 14px; line-height: 1; }
+  /* 勾勾用 CSS 畫（線條粗細一致、圓角），不用文字的 ✓ */
+  .check input:checked::after { content: ""; width: 6px; height: 11px; border: solid var(--inverse-ink); border-width: 0 2px 2px 0; border-radius: 1px; transform: translateY(-1px) rotate(45deg); }
 
   /* 組別卡 */
   .groups { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
@@ -136,7 +137,7 @@
   }
   .box { width: 14px; height: 14px; border: 1.5px solid var(--faint); border-radius: 4px; }
   [aria-pressed="true"] .box { background: var(--inverse-ink); border-color: var(--inverse-ink); display: grid; place-items: center; }
-  [aria-pressed="true"] .box::after { content: "✓"; color: var(--inverse-bg); font-size: 10px; line-height: 1; }
+  [aria-pressed="true"] .box::after { content: ""; width: 4px; height: 7px; border: solid var(--inverse-bg); border-width: 0 1.5px 1.5px 0; border-radius: 1px; transform: translateY(-1px) rotate(45deg); }
 
   /* 日期切換 */
   .dates { display: flex; gap: 4px; padding: 4px; border-radius: 999px; background: var(--chip); overflow-x: auto; max-width: 100%; align-self: flex-start; scrollbar-width: none; }
