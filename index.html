@@ -20,7 +20,7 @@
     src: local("Taipei Sans TC Beta Bold"), local("TaipeiSansTCBeta-Bold"), url("fonts/TaipeiSansTC-Bold.woff2") format("woff2");
     font-weight: 700; font-display: swap;
   }
-  /* 版面：手機優先，一次一個步驟（同意 → 組別 → 時段 → 資料），底部固定「上一步／下一步」；
+  /* 版面：手機優先，一次一個步驟（同意 → 時段 → 資料；組別由系統隨機分派），底部固定「上一步／下一步」；
      電腦版左側多一條直排大字。冷灰底、白色圓角卡片、大號細字數字。 */
   :root {
     --bg: #e9ebee;
@@ -243,7 +243,7 @@
     <div class="topbar">
       <span class="status" id="status">報名開放中</span>
       <div class="progress" id="progress" aria-hidden="true">
-        <span>01<span class="lbl"> 同意</span></span><span>02<span class="lbl"> 組別</span></span><span>03<span class="lbl"> 時段</span></span><span>04<span class="lbl"> 資料</span></span>
+        <span>01<span class="lbl"> 同意</span></span><span>02<span class="lbl"> 時段</span></span><span>03<span class="lbl"> 資料</span></span>
       </div>
     </div>
 
@@ -319,19 +319,9 @@
         </div>
       </section>
 
-      <!-- 步驟 2：組別 -->
+      <!-- 步驟 2：日期與時段 -->
       <section class="card" data-step="2" hidden>
-        <div class="num">02<small>Group</small></div>
-        <div class="card-body">
-          <h2>選擇組別</h2>
-          <p class="hint">請選擇助教告知您的組別。</p>
-          <div class="groups" id="groups" role="group" aria-label="組別"></div>
-        </div>
-      </section>
-
-      <!-- 步驟 3：日期與時段 -->
-      <section class="card" data-step="3" hidden>
-        <div class="num">03<small>Date &amp; time</small></div>
+        <div class="num">02<small>Date &amp; time</small></div>
         <div class="card-body">
           <h2>選擇日期與時段</h2>
           <p class="hint" id="slotHint">先選日期，再點選一個時段。灰色斜線代表已被選走。</p>
@@ -340,12 +330,12 @@
         </div>
       </section>
 
-      <!-- 步驟 4：資料 -->
-      <section class="card" data-step="4" hidden>
-        <div class="num">04<small>Your info</small></div>
+      <!-- 步驟 3：資料 -->
+      <section class="card" data-step="3" hidden>
+        <div class="num">03<small>Your info</small></div>
         <div class="card-body">
           <h2>填寫基本資料</h2>
-          <dl class="recap"><dt>Group</dt><dd id="rGroup"></dd><dt>Time</dt><dd id="rTime"></dd></dl>
+          <dl class="recap"><dt>Time</dt><dd id="rTime"></dd></dl>
           <form id="form" novalidate>
             <div class="fields">
               <label class="field"><span>姓名 Name</span><input type="text" id="name" autocomplete="name" placeholder="例：柯承翰" required></label>
@@ -383,7 +373,6 @@
       </div>
       <dl>
         <dt>Name</dt><dd id="dName"></dd>
-        <dt>Group</dt><dd id="dGroup"></dd>
         <dt>Time</dt><dd id="dTime"></dd>
         <dt>Place</dt><dd id="dLocation"></dd>
         <dt>Contact</dt><dd id="dContact"></dd>
@@ -405,7 +394,8 @@
   // 還沒填 API_URL 時自動進入預覽模式：顯示範例時段，報名不會被儲存
   const PREVIEW = !/^https:\/\/script\.google\.com\/.+\/exec$/.test(API_URL) || API_URL.includes('請貼上');
 
-  const state = { step: 1, groups: [], slots: [], group: null, date: null, slot: null, loaded: false, sending: false };
+  const LAST = 3; // 01 同意 → 02 時段 → 03 資料（組別由系統隨機分派，不讓受測者選）
+  const state = { step: 1, groups: [], slots: [], date: null, slot: null, loaded: false, sending: false };
   const $ = id => document.getElementById(id);
 
   // ---------- 資料 ----------
@@ -462,7 +452,7 @@
   // 用 text/plain 送出 JSON，瀏覽器才不會先發預檢請求（Apps Script 不支援）
   async function postBooking(form) {
     if (PREVIEW) {
-      return { ok: true, bookingId: 'PREVIEW', name: form.name, group: form.group,
+      return { ok: true, bookingId: 'PREVIEW', name: form.name,
         date: state.slot.date, weekday: state.slot.weekday, time: `${state.slot.start}–${state.slot.end}` };
     }
     const res = await fetch(API_URL, {
@@ -474,7 +464,6 @@
   }
 
   // ---------- 畫面 ----------
-  const slotsForGroup = () => state.slots.filter(s => s.open.includes(state.group));
   const fmtDate = s => `${s.date.slice(5).replace('-', '/')}（${s.weekday}）`;
 
   function render() {
@@ -483,51 +472,21 @@
     [...$('progress').children].forEach((el, i) => {
       el.className = i + 1 === state.step ? 'on' : i + 1 < state.step ? 'done' : '';
     });
-    $('railStep').textContent = `STEP 0${state.step} / 04`;
+    $('railStep').textContent = `STEP 0${state.step} / 0${LAST}`;
     $('back').hidden = state.step === 1;
-    $('nextLabel').textContent = state.sending ? '送出中…' : state.step === 4 ? '送出報名' : '下一步';
+    $('nextLabel').textContent = state.sending ? '送出中…' : state.step === LAST ? '送出報名' : '下一步';
     $('next').disabled = !canProceed() || state.sending;
 
-    if (state.step === 2) renderGroups();
-    if (state.step === 3) renderSlots();
-    if (state.step === 4) {
-      $('rGroup').textContent = `${state.group} 組`;
+    if (state.step === 2) renderSlots();
+    if (state.step === 3) {
       $('rTime').textContent = state.slot ? `${fmtDate(state.slot)} ${state.slot.start}–${state.slot.end}` : '';
     }
   }
 
   function canProceed() {
     if (state.step === 1) return $('eligible').checked && $('consent').checked;
-    if (state.step === 2) return !!state.group;
-    if (state.step === 3) return !!state.slot;
+    if (state.step === 2) return !!state.slot;
     return ['name', 'studentId', 'dept', 'program', 'grade', 'email', 'phone'].every(id => $(id).value.trim());
-  }
-
-  function renderGroups() {
-    const box = $('groups');
-    box.innerHTML = '';
-    if (!state.loaded) { box.innerHTML = '<p class="muted">讀取中…</p>'; return; }
-    state.groups.forEach(g => {
-      const free = state.slots.some(s => s.open.includes(g.id));
-      const b = document.createElement('button');
-      b.type = 'button'; b.className = 'group';
-      b.disabled = g.remaining <= 0 || !free;
-      b.setAttribute('aria-pressed', state.group === g.id ? 'true' : 'false');
-      b.setAttribute('aria-label', `${g.id} 組${b.disabled ? '，已額滿' : ''}`);
-      const top = document.createElement('div'); top.className = 'tagline';
-      const t = document.createElement('span'); t.textContent = 'GROUP';
-      const chk = document.createElement('span'); chk.className = 'box';
-      top.append(t, chk);
-      const letter = document.createElement('div'); letter.className = 'letter'; letter.textContent = g.id;
-      const left = document.createElement('div'); left.className = 'left';
-      left.textContent = b.disabled ? '已額滿' : '可報名';
-      b.append(top, letter, left);
-      b.addEventListener('click', () => {
-        if (state.group !== g.id) { state.group = g.id; state.slot = null; state.date = null; }
-        render();
-      });
-      box.appendChild(b);
-    });
   }
 
   function renderSlots() {
@@ -538,9 +497,10 @@
     const byDate = {};
     state.slots.forEach(s => (byDate[s.date] = byDate[s.date] || []).push(s));
     const dates = Object.keys(byDate).sort();
-    const hasFree = d => byDate[d].some(s => s.open.includes(state.group));
+    const isFree = s => s.open.length > 0; // 這個時段還有任一組有空位
+    const hasFree = d => byDate[d].some(isFree);
     if (!dates.some(hasFree)) {
-      box.innerHTML = '<p class="muted">這一組目前沒有可報名的時段，請聯絡助教。</p>';
+      box.innerHTML = '<p class="muted">目前沒有可報名的時段，請聯絡助教。</p>';
       return;
     }
     if (!state.date || !byDate[state.date]) state.date = (state.slot && state.slot.date) || dates.find(hasFree);
@@ -560,7 +520,7 @@
     const grid = document.createElement('div');
     grid.className = 'times';
     byDate[state.date].sort((a, b) => a.start.localeCompare(b.start)).forEach(s => {
-      const free = s.open.includes(state.group);
+      const free = isFree(s);
       const b = document.createElement('button');
       b.type = 'button'; b.className = 'slot';
       b.disabled = !free;
@@ -609,10 +569,10 @@
   $('back').addEventListener('click', () => go(state.step - 1));
 
   $('next').addEventListener('click', async () => {
-    if (state.step < 4) { go(state.step + 1); return; }
+    if (state.step < LAST) { go(state.step + 1); return; }
 
     const form = {
-      consent: $('consent').checked, eligible: $('eligible').checked, group: state.group, slotId: state.slot.id,
+      consent: $('consent').checked, eligible: $('eligible').checked, slotId: state.slot.id,
       name: $('name').value, studentId: $('studentId').value, dept: $('dept').value, program: $('program').value, grade: $('grade').value,
       email: $('email').value, phone: $('phone').value,
     };
@@ -627,14 +587,13 @@
         if (res.refresh) {
           state.slot = null;
           await loadData();
-          go(3);
+          go(2);
           $('msg').textContent = res.message;
         }
         return;
       }
       $('dCode').textContent = res.bookingId;
       $('dName').textContent = res.name;
-      $('dGroup').textContent = `${res.group} 組`;
       $('dTime').textContent = `${res.date}（${res.weekday}）${res.time}`;
       $('booking').hidden = true;
       $('hero').hidden = true;
