@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>研究施測後台</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,200..700&family=Noto+Sans+TC:wght@300;400;500;700&display=swap">
+<style>
+  @font-face {
+    font-family: "Taipei Sans TC";
+    src: local("Taipei Sans TC Beta"), local("TaipeiSansTCBeta-Regular"), url("fonts/TaipeiSansTC-Regular.woff2") format("woff2");
+    font-weight: 400; font-display: swap;
+  }
+  @font-face {
+    font-family: "Taipei Sans TC";
+    src: local("Taipei Sans TC Beta Bold"), local("TaipeiSansTCBeta-Bold"), url("fonts/TaipeiSansTC-Bold.woff2") format("woff2");
+    font-weight: 700; font-display: swap;
+  }
+  /* 後台：與報名頁同一套視覺（冷灰底、白卡、細體大數字），給老師與助教看名單、改狀態。 */
+  :root {
+    --bg: #e9ebee;
+    --surface: #ffffff;
+    --ink: #111315;
+    --muted: #6b7178;
+    --faint: #a9aeb4;
+    --line: #d6d9dd;
+    --chip: #f2f3f5;
+    --inverse-bg: #111315;
+    --inverse-ink: #ffffff;
+    --danger: #c2412d;
+    --ok: #23855a;
+    --ok-bg: #e2f2ea;
+    --warn: #a86a00;
+    --warn-bg: #fbefd6;
+    --display: "Archivo", "Noto Sans TC", system-ui, sans-serif;
+    --body: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", system-ui, sans-serif;
+    --small: "Taipei Sans TC", "Noto Sans TC", "PingFang TC", system-ui, sans-serif;
+    --radius: 18px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0c0d0e; --surface: #17191b; --ink: #f1f2f3; --muted: #9298a0; --faint: #5a6068;
+      --line: #2a2d31; --chip: #212427; --inverse-bg: #f1f2f3; --inverse-ink: #0c0d0e; --danger: #f08a74;
+      --ok: #6fd3a1; --ok-bg: #16352a; --warn: #f0be5c; --warn-bg: #3a2d12;
+      color-scheme: dark;
+    }
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body { margin: 0; }
+  body { background: var(--bg); color: var(--ink); font: 15px/1.6 var(--body); -webkit-font-smoothing: antialiased; }
+  button, input, select, textarea { font: inherit; color: inherit; }
+
+  .shell { display: grid; grid-template-columns: 88px minmax(0, 1fr); min-height: 100vh; }
+  .rail {
+    position: sticky; top: 0; height: 100vh; border-right: 1px solid var(--line);
+    display: flex; flex-direction: column; justify-content: space-between; align-items: center; padding: 24px 0;
+  }
+  .rail .word { writing-mode: vertical-rl; font: 300 46px/1 var(--body); letter-spacing: .12em; white-space: nowrap; }
+  .rail .word b { font-weight: 700; }
+  .rail .tag { font: 400 10px/1 var(--small); letter-spacing: .14em; color: var(--muted); writing-mode: vertical-rl; transform: rotate(180deg); }
+  .content { min-width: 0; padding: 0 max(16px, 4vw) 64px; max-width: 1240px; }
+
+  .label { font: 400 10px/1.4 var(--small); letter-spacing: .14em; color: var(--muted); text-transform: uppercase; }
+  .eyebrow { font: 400 11px/1 var(--small); letter-spacing: .16em; color: var(--muted); text-transform: uppercase; }
+
+  /* 頂部 */
+  .topbar {
+    display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; justify-content: space-between;
+    padding: 18px 0; border-bottom: 1px solid var(--line);
+  }
+  .status { display: inline-flex; align-items: center; gap: 8px; font: 400 11px/1 var(--small); letter-spacing: .1em; color: var(--muted); }
+  .status::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: #3fae7a; flex: none; }
+  .status.preview { color: var(--ink); }
+  .status.preview::before { background: #e0a526; }
+  .status.busy::before { background: var(--faint); }
+  .tools { display: flex; flex-wrap: wrap; gap: 6px; }
+  .btn {
+    display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; border-radius: 999px;
+    border: 1px solid var(--line); background: var(--surface); cursor: pointer; text-decoration: none;
+    font: 400 12px/1 var(--small); letter-spacing: .06em;
+  }
+  .btn:hover { border-color: var(--ink); }
+  .btn:disabled { opacity: .45; cursor: not-allowed; }
+  .btn.dark { background: var(--inverse-bg); color: var(--inverse-ink); border-color: var(--inverse-bg); }
+
+  .head { padding: 36px 0 20px; display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px; }
+  .head h1 { margin: 10px 0 0; font: 300 clamp(32px, 5vw, 56px)/1.05 var(--body); letter-spacing: -.02em; }
+
+  /* 總覽 */
+  .stats { display: grid; grid-template-columns: 1.3fr repeat(3, minmax(0, 1fr)); gap: 10px; }
+  .stat { background: var(--surface); border-radius: var(--radius); padding: 18px 20px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+  .stat .top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+  .stat .big { font: 200 56px/.95 var(--display); font-stretch: 108%; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
+  .stat .big small { font: 300 20px/1 var(--display); color: var(--muted); letter-spacing: 0; margin-left: 4px; }
+  .stat .letter { font: 200 40px/1 var(--display); font-stretch: 112%; }
+  .bar { height: 6px; border-radius: 999px; background: var(--chip); overflow: hidden; display: flex; }
+  .bar i { display: block; height: 100%; background: var(--ink); }
+  .bar i.done { background: var(--ok); }
+  .stat .sub { display: flex; flex-wrap: wrap; gap: 4px 12px; font: 400 12px/1.4 var(--small); color: var(--muted); }
+  .stat.total { background: var(--inverse-bg); color: var(--inverse-ink); }
+  .stat.total .label, .stat.total .sub, .stat.total .big small { color: var(--inverse-ink); opacity: .65; }
+  .stat.total .bar { background: color-mix(in srgb, var(--inverse-ink) 18%, transparent); }
+  .stat.total .bar i { background: var(--inverse-ink); }
+  .stat.total .bar i.done { background: #6fd3a1; }
+
+  /* 篩選列 */
+  .toolbar { margin: 28px 0 14px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+  .seg { display: inline-flex; gap: 2px; padding: 3px; border-radius: 999px; background: var(--chip); }
+  .seg button { border: 0; background: transparent; padding: 8px 14px; border-radius: 999px; cursor: pointer; color: var(--muted); font: 500 13px/1 var(--body); white-space: nowrap; }
+  .seg button[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px rgb(0 0 0 / .08); }
+  .toolbar .grow { flex: 1; }
+  .search { min-width: 0; flex: 1 1 220px; max-width: 320px; padding: 9px 14px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); font-size: 14px; }
+  .select { padding: 8px 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); font-size: 13px; }
+  .toggle { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); cursor: pointer; }
+
+  /* 狀態標籤 */
+  .chip { display: inline-flex; align-items: center; padding: 3px 8px; border-radius: 999px; font: 400 11px/1.3 var(--small); letter-spacing: .04em; background: var(--chip); color: var(--muted); white-space: nowrap; }
+  .chip.s-已完成 { background: var(--ok-bg); color: var(--ok); }
+  .chip.s-未到 { background: var(--warn-bg); color: var(--warn); }
+  .chip.s-取消 { background: transparent; color: var(--faint); text-decoration: line-through; border: 1px dashed var(--line); }
+  /* 問卷填寫狀態：實心＝已填、虛線＝未填 */
+  .sv { display: inline-flex; gap: 4px; }
+  .sv i { font: normal 400 10px/1 var(--small); letter-spacing: .04em; padding: 3px 6px; border-radius: 999px; border: 1px dashed var(--line); color: var(--faint); white-space: nowrap; }
+  .sv i.on { border: 1px solid var(--ok); background: var(--ok-bg); color: var(--ok); }
+
+  /* 時程表 */
+  .day { background: var(--surface); border-radius: var(--radius); padding: 16px 18px 18px; margin-bottom: 12px; }
+  .day.today { box-shadow: inset 0 0 0 2px var(--ink); }
+  .day-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
+  .day-head h3 { margin: 0; font: 300 26px/1 var(--display); font-stretch: 105%; font-variant-numeric: tabular-nums; }
+  .day-head h3 span { font: 400 14px/1 var(--body); margin-left: 6px; color: var(--muted); }
+  .grid { display: grid; gap: 6px; }
+  .grid-row { display: grid; grid-template-columns: 64px repeat(var(--cols), minmax(0, 1fr)); gap: 6px; align-items: stretch; }
+  .grid-row.hdr { font: 400 10px/1 var(--small); letter-spacing: .14em; color: var(--muted); }
+  .grid-row.hdr > div { padding: 2px 4px; }
+  .t { font: 300 18px/1 var(--display); font-variant-numeric: tabular-nums; padding-top: 12px; }
+  .cell { min-height: 54px; border-radius: 12px; border: 1px dashed var(--line); padding: 8px 10px; display: flex; flex-direction: column; justify-content: center; gap: 4px; min-width: 0; color: var(--faint); font-size: 12px; }
+  .cell.closed { background: repeating-linear-gradient(135deg, transparent 0 7px, var(--chip) 7px 8px); border-style: solid; border-color: transparent; }
+  button.cell { border: 1px solid var(--line); background: var(--chip); color: var(--ink); text-align: left; cursor: pointer; }
+  button.cell:hover { border-color: var(--ink); }
+  .cell .who { display: flex; justify-content: space-between; align-items: center; gap: 6px; }
+  .cell .nm { font-weight: 500; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .cell .sid { font: 400 11px/1.2 var(--small); color: var(--muted); letter-spacing: .04em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  button.cell.st-已完成 { background: var(--ok-bg); border-color: transparent; }
+  button.cell.st-未到 { background: var(--warn-bg); border-color: transparent; }
+  button.cell.st-取消 { background: transparent; color: var(--faint); }
+  .cell .more { font: 400 11px/1.2 var(--small); color: var(--faint); }
+
+  /* 名單表格 */
+  .table-wrap { background: var(--surface); border-radius: var(--radius); overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th { text-align: left; font: 400 10px/1 var(--small); letter-spacing: .14em; color: var(--muted); padding: 14px 12px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  td { padding: 11px 12px; border-bottom: 1px solid var(--line); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  td.note { white-space: normal; min-width: 160px; max-width: 280px; color: var(--muted); font-size: 13px; }
+  tbody tr { cursor: pointer; }
+  tbody tr:hover td { background: var(--chip); }
+  tbody tr:last-child td { border-bottom: 0; }
+  tr.cancelled td:not(:last-child) { color: var(--faint); }
+  .g { display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 7px; background: var(--inverse-bg); color: var(--inverse-ink); font: 500 13px/1 var(--display); }
+  .empty { background: var(--surface); border-radius: var(--radius); padding: 40px 20px; text-align: center; color: var(--muted); }
+  .count { font: 400 12px/1 var(--small); color: var(--muted); letter-spacing: .06em; }
+
+  /* 詳細資料面板 */
+  .scrim { position: fixed; inset: 0; background: rgb(0 0 0 / .32); z-index: 20; }
+  .panel {
+    position: fixed; z-index: 21; top: 0; right: 0; bottom: 0; width: min(440px, 100%);
+    background: var(--surface); box-shadow: -8px 0 32px rgb(0 0 0 / .16); overflow-y: auto;
+    padding: calc(20px + env(safe-area-inset-top, 0px)) max(24px, env(safe-area-inset-right, 0px)) calc(24px + env(safe-area-inset-bottom, 0px)) 24px;
+    display: flex; flex-direction: column; gap: 20px;
+  }
+  .panel-top { display: flex; justify-content: space-between; align-items: center; }
+  .x { width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--line); background: var(--surface); cursor: pointer; font-size: 18px; }
+  .pid { font: 200 52px/.9 var(--display); font-stretch: 112%; letter-spacing: .02em; }
+  .pname { font: 500 22px/1.3 var(--body); margin: 8px 0 0; }
+  .info { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 8px 18px; margin: 0; padding: 16px; border-radius: 12px; background: var(--chip); }
+  .info dt { font: 400 10px/2.1 var(--small); letter-spacing: .14em; color: var(--muted); }
+  .info dd { margin: 0; overflow-wrap: anywhere; user-select: text; font-variant-numeric: tabular-nums; }
+  .status-pick { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+  .status-pick button { padding: 12px 4px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface); cursor: pointer; font-size: 14px; }
+  .status-pick button[aria-pressed="true"] { background: var(--inverse-bg); color: var(--inverse-ink); border-color: var(--inverse-bg); }
+  .status-pick button:disabled { opacity: .5; cursor: wait; }
+  textarea { width: 100%; min-height: 96px; resize: vertical; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--line); background: var(--chip); font-size: 15px; }
+  textarea:focus { background: var(--surface); }
+  .row { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+  .msg { margin: 0; color: var(--danger); font-size: 14px; }
+  .msg:empty { display: none; }
+  .saved { color: var(--ok); font-size: 13px; }
+
+  /* 登入 */
+  .login { max-width: 460px; margin: 10vh 0 0; background: var(--surface); border-radius: var(--radius); padding: clamp(24px, 4vw, 40px); display: flex; flex-direction: column; gap: 18px; }
+  .login h1 { margin: 6px 0 0; font: 300 40px/1.1 var(--body); letter-spacing: -.02em; }
+  .login p { margin: 0; color: var(--muted); font-size: 14px; }
+  .login input { padding: 13px 16px; border-radius: 12px; border: 1px solid var(--line); background: var(--chip); font-size: 16px; width: 100%; }
+  .primary {
+    display: inline-flex; align-items: center; justify-content: space-between; gap: 12px;
+    padding: 6px 6px 6px 22px; border: 0; border-radius: 999px;
+    background: var(--inverse-bg); color: var(--inverse-ink); font: 500 15px/1 var(--body); cursor: pointer;
+  }
+  .primary .arrow { width: 36px; height: 36px; border-radius: 50%; background: var(--inverse-ink); color: var(--inverse-bg); display: grid; place-items: center; font-size: 16px; }
+  .primary:disabled { opacity: .4; cursor: wait; }
+
+  :focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+
+  @media (max-width: 960px) {
+    .stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .stat.total { grid-column: 1 / -1; }
+  }
+  @media (max-width: 760px) {
+    .shell { grid-template-columns: 1fr; }
+    .rail { position: static; height: auto; flex-direction: row; padding: 14px max(16px, 4vw); border-right: 0; border-bottom: 1px solid var(--line); }
+    .rail .word { writing-mode: horizontal-tb; font-size: 22px; letter-spacing: .08em; }
+    .rail .tag { writing-mode: horizontal-tb; transform: none; }
+    .head { padding: 24px 0 14px; }
+    .stat { padding: 14px; }
+    .stat .big { font-size: 40px; }
+    .stat .letter { font-size: 28px; }
+    .stat:not(.total) .sub span:not(:first-child) { display: none; }
+    .grid-row { grid-template-columns: 46px repeat(var(--cols), minmax(0, 1fr)); gap: 4px; }
+    .t { font-size: 14px; }
+    .cell { padding: 6px 7px; min-height: 48px; }
+    .cell .nm { font-size: 13px; }
+    .cell .chip { display: none; }
+    .day { padding: 14px 12px; }
+    .search { max-width: none; }
+    .panel { top: auto; width: 100%; max-height: 88vh; border-radius: 20px 20px 0 0; padding-left: max(20px, env(safe-area-inset-left, 0px)); padding-right: max(20px, env(safe-area-inset-right, 0px)); }
+  }
+</style>
+</head>
+<body data-page="admin">
+<div class="shell">
+  <aside class="rail">
+    <div class="tag">NSTC · 2026</div>
+    <div class="word" aria-hidden="true"><b>創意發想</b>研究</div>
+    <div class="tag">STAFF ONLY</div>
+  </aside>
+
+  <div class="content">
+    <!-- 登入 -->
+    <section class="login" id="login">
+      <div class="eyebrow">Staff only · 研究人員後台</div>
+      <h1>後台登入</h1>
+      <p>請輸入老師提供的後台密碼。這台裝置關閉瀏覽器分頁後就需要重新輸入。</p>
+      <form id="loginForm" style="display:flex;flex-direction:column;gap:14px">
+        <input type="password" id="pw" autocomplete="current-password" placeholder="後台密碼" aria-label="後台密碼">
+        <button class="primary" id="loginBtn" type="submit"><span>進入後台</span><span class="arrow" aria-hidden="true">↗</span></button>
+      </form>
+      <p class="msg" id="loginMsg" role="alert"></p>
+      <p id="previewNote" hidden>目前是預覽模式（還沒接上試算表），輸入任何文字都能進入，看到的是範例資料。</p>
+    </section>
+
+    <!-- 後台 -->
+    <div id="app" hidden>
+      <div class="topbar">
+        <span class="status" id="status">讀取中…</span>
+        <div class="tools">
+          <button class="btn" id="refresh" type="button">↻ 重新整理</button>
+          <button class="btn" id="csv" type="button">下載 CSV</button>
+          <a class="btn" id="sheetLink" href="#" target="_blank" rel="noopener" hidden>開啟試算表 ↗</a>
+          <button class="btn" id="logout" type="button">登出</button>
+        </div>
+      </div>
+
+      <div class="head">
+        <div>
+          <div class="eyebrow">Dashboard · 施測進度</div>
+          <h1>施測後台</h1>
+        </div>
+        <span class="count" id="nextUp"></span>
+      </div>
+
+      <div class="stats" id="stats"></div>
+
+      <div class="toolbar">
+        <div class="seg" role="group" aria-label="檢視方式" id="viewSeg">
+          <button type="button" data-view="schedule" aria-pressed="true">時程表</button>
+          <button type="button" data-view="list" aria-pressed="false">名單</button>
+        </div>
+        <div class="seg" role="group" aria-label="組別" id="groupSeg"></div>
+        <span class="grow"></span>
+        <label class="toggle" id="pastToggle"><input type="checkbox" id="showPast"> 顯示已過日期</label>
+        <label class="toggle" id="emptyToggle"><input type="checkbox" id="hideEmpty" checked> 只顯示有人報名的日期</label>
+        <input class="search" id="q" type="search" placeholder="搜尋姓名、學號、編號、手機" hidden>
+        <select class="select" id="statusFilter" aria-label="狀態" hidden></select>
+      </div>
+
+      <div id="view"></div>
+    </div>
+  </div>
+</div>
+
+<div class="scrim" id="scrim" hidden></div>
+<aside class="panel" id="panel" role="dialog" aria-modal="true" aria-labelledby="pName" hidden>
+  <div class="panel-top">
+    <span class="eyebrow">Booking · 報名資料</span>
+    <button class="x" id="close" type="button" aria-label="關閉">×</button>
+  </div>
+  <div>
+    <div class="pid" id="pId"></div>
+    <p class="pname" id="pName"></p>
+  </div>
+  <dl class="info" id="pInfo"></dl>
+  <div style="display:flex;flex-direction:column;gap:8px">
+    <span class="label">狀態 Status</span>
+    <div class="status-pick" id="pStatus"></div>
+  </div>
+  <div style="display:flex;flex-direction:column;gap:8px">
+    <span class="label">備註 Note</span>
+    <textarea id="pNote" placeholder="例：遲到 10 分鐘、設備狀況、改期紀錄"></textarea>
+    <div class="row"><span id="pSaved" class="saved"></span><button class="btn dark" id="saveNote" type="button">儲存備註</button></div>
+  </div>
+  <p class="msg" id="pMsg" role="alert"></p>
+</aside>
+
+<script>
+  // 與 index.html 相同的 Apps Script 網址
+  const API_URL = 'https://script.google.com/macros/s/AKfycbzF0l-VlVxytK2UXsmRA2xX2BnW_RWkS8FmfwqrzcTRvi0psJjKTy2g24c-dVKXHwDI/exec';
+  const PREVIEW = !/^https:\/\/script\.google\.com\/.+\/exec$/.test(API_URL) || API_URL.includes('請貼上');
+
+  const $ = id => document.getElementById(id);
+  const esc = v => String(v == null ? '' : v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const FREE = ['取消', '未到'];
+  const today = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Taipei' }).format(new Date());
+
+  const state = { key: '', data: null, view: 'schedule', group: 'all', q: '', status: 'active', showPast: false, hideEmpty: true, openId: null, loadedAt: 0 };
+
+  function store(k, v) { try { v == null ? sessionStorage.removeItem(k) : sessionStorage.setItem(k, v); } catch (e) {} }
+  function recall(k) { try { return sessionStorage.getItem(k); } catch (e) { return null; } }
+
+  // ---------- 資料 ----------
+  async function api(body) {
+    if (PREVIEW) return previewApi(body);
+    const res = await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(body) });
+    return res.json();
+  }
+
+  async function load(silent) {
+    setStatus('讀取中…', 'busy');
+    $('refresh').disabled = true;
+    try {
+      const r = await api({ action: 'admin', key: state.key });
+      if (!r.ok) {
+        if (r.auth) return showLogin(r.message);
+        throw new Error(r.message || '讀取失敗');
+      }
+      state.data = r;
+      state.loadedAt = Date.now();
+      render();
+      setStatus(PREVIEW ? '預覽模式 · 範例資料' : `已更新 ${r.generatedAt.slice(5, 16)}`, PREVIEW ? 'preview' : '');
+    } catch (e) {
+      setStatus('讀取失敗，請按重新整理', 'busy');
+      if (!silent) console.error(e);
+    } finally {
+      $('refresh').disabled = false;
+    }
+  }
+
+  function setStatus(text, cls) { const s = $('status'); s.textContent = text; s.className = 'status' + (cls ? ' ' + cls : ''); }
+
+  // ---------- 登入 ----------
+  function showLogin(message) {
+    state.key = ''; store('adminKey', null);
+    $('app').hidden = true; $('login').hidden = false;
+    $('loginMsg').textContent = message || '';
+    $('pw').value = ''; $('pw').focus();
+  }
+
+  $('loginForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    const pw = $('pw').value;
+    if (!pw) return;
+    $('loginBtn').disabled = true; $('loginMsg').textContent = '';
+    try {
+      const r = await api({ action: 'admin', key: pw });
+      if (!r.ok) { $('loginMsg').textContent = r.message || '登入失敗'; $('pw').select(); return; }
+      state.key = pw; store('adminKey', pw);
+      enterApp(r);
+    } catch (err) {
+      $('loginMsg').textContent = '連線失敗，請確認網路後再試一次。';
+    } finally {
+      $('loginBtn').disabled = false;
+    }
+  });
+
+  function enterApp(r) {
+    $('login').hidden = true; $('app').hidden = false;
+    state.data = r; state.loadedAt = Date.now();
+    setStatus(PREVIEW ? '預覽模式 · 範例資料' : `已更新 ${r.generatedAt.slice(5, 16)}`, PREVIEW ? 'preview' : '');
+    render();
+  }
+
+  $('logout').addEventListener('click', () => { closePanel(); showLogin(''); });
+  $('refresh').addEventListener('click', () => load());
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && state.key && state.openId == null && Date.now() - state.loadedAt > 60000) load(true);
+  });
+
+  // ---------- 畫面 ----------
+  const counted = b => FREE.indexOf(b.status) === -1;
+  const slotLabel = b => `${b.date.slice(5).replace('-', '/')} ${b.time.split('–')[0]}`;
+  const byTime = (a, b) => (a.slotId < b.slotId ? -1 : a.slotId > b.slotId ? 1 : a.group < b.group ? -1 : 1);
+  // 問卷狀態小標籤
+  const sv = b => `<span class="sv" title="基本資料表／研究問卷"><i class="${b.basicAt ? 'on' : ''}">基本資料</i><i class="${b.postAt ? 'on' : ''}">問卷</i></span>`;
+  const weekdayOf = date => '日一二三四五六'[new Date(date + 'T12:00:00+08:00').getDay()];
+
+  function render() {
+    const d = state.data; if (!d) return;
+    renderStats(d);
+    renderGroupSeg(d);
+    const sched = state.view === 'schedule';
+    $('pastToggle').hidden = !sched; $('emptyToggle').hidden = !sched;
+    $('q').hidden = sched; $('statusFilter').hidden = sched;
+    $('sheetLink').hidden = !d.config.sheetUrl;
+    if (d.config.sheetUrl) $('sheetLink').href = d.config.sheetUrl;
+    sched ? renderSchedule(d) : renderList(d);
+    if (state.openId) fillPanel();
+  }
+
+  function renderStats(d) {
+    const { groups, cap, staff } = d.config;
+    const act = d.bookings.filter(counted);
+    const tally = list => ({ n: list.filter(counted).length, done: list.filter(b => b.status === '已完成').length, miss: list.filter(b => b.status === '未到').length, cancel: list.filter(b => b.status === '取消').length });
+    const pct = (n, of) => Math.min(100, of ? n / of * 100 : 0).toFixed(1) + '%';
+    const all = tally(d.bookings), totalCap = cap * groups.length;
+    const bar = t => `<div class="bar" aria-hidden="true"><i class="done" style="width:${pct(t.done, t.cap)}"></i><i style="width:${pct(t.n - t.done, t.cap)}"></i></div>`;
+    let html = `<div class="stat total">
+      <div class="top"><span class="label">Total · 全部</span><span class="label">上限 ${totalCap}</span></div>
+      <div class="big">${all.n}<small>/ ${totalCap}</small></div>
+      ${bar({ ...all, cap: totalCap })}
+      <div class="sub"><span>已完成 ${all.done}</span><span>待施測 ${all.n - all.done}</span><span>未到 ${all.miss}</span><span>取消 ${all.cancel}</span></div>
+      <div class="sub"><span>基本資料表 ${act.filter(b => b.basicAt).length}</span><span>研究問卷 ${act.filter(b => b.postAt).length}</span></div>
+    </div>`;
+    groups.forEach(g => {
+      const t = tally(d.bookings.filter(b => b.group === g));
+      html += `<div class="stat">
+        <div class="top"><span class="letter">${esc(g)}</span><span class="label">${esc(staff[g] || '')}</span></div>
+        <div class="big">${t.n}<small>/ ${cap}</small></div>
+        ${bar({ ...t, cap })}
+        <div class="sub"><span>完成 ${t.done}</span><span>未到 ${t.miss}</span><span>取消 ${t.cancel}</span></div>
+      </div>`;
+    });
+    $('stats').innerHTML = html;
+
+    const next = act.filter(b => b.status === '已報名' && b.date >= today).sort(byTime)[0];
+    $('nextUp').textContent = next ? `下一場：${next.date.slice(5).replace('-', '/')}（${weekdayOf(next.date)}）${next.time.split('–')[0]}` : '';
+  }
+
+  function renderGroupSeg(d) {
+    const opts = [['all', '全部'], ...d.config.groups.map(g => [g, g + ' 組'])];
+    $('groupSeg').innerHTML = opts.map(([v, l]) => `<button type="button" data-group="${esc(v)}" aria-pressed="${state.group === v}">${esc(l)}</button>`).join('');
+    if (!$('statusFilter').options.length) {
+      const sOpts = [['active', '有效報名（不含取消）'], ['all', '全部狀態'], ...d.config.statuses.map(s => [s, s])];
+      $('statusFilter').innerHTML = sOpts.map(([v, l]) => `<option value="${esc(v)}">${esc(l)}</option>`).join('');
+      $('statusFilter').value = state.status;
+    }
+  }
+
+  function renderSchedule(d) {
+    const groups = state.group === 'all' ? d.config.groups : [state.group];
+    const byDate = {};
+    d.slots.forEach(s => (byDate[s.date] = byDate[s.date] || { slots: [], weekday: s.weekday }).slots.push(s));
+    // 不在時段表裡的報名（例如時段被刪掉）也要顯示
+    d.bookings.forEach(b => { if (!byDate[b.date]) byDate[b.date] = { slots: [], weekday: weekdayOf(b.date) }; });
+    const people = {};
+    d.bookings.forEach(b => { const k = b.slotId + '|' + b.group; (people[k] = people[k] || []).push(b); });
+    Object.values(people).forEach(list => list.sort((a, b) => counted(b) - counted(a)));
+
+    let dates = Object.keys(byDate).sort();
+    if (!state.showPast) dates = dates.filter(x => x >= today);
+    const hasPeople = date => d.bookings.some(b => b.date === date && groups.indexOf(b.group) !== -1 && b.status !== '取消');
+    if (state.hideEmpty) dates = dates.filter(hasPeople);
+
+    if (!dates.length) {
+      $('view').innerHTML = `<div class="empty">${state.hideEmpty ? '目前沒有人報名。取消勾選「只顯示有人報名的日期」可以看所有時段。' : '沒有可顯示的日期。'}</div>`;
+      return;
+    }
+    $('view').innerHTML = dates.map(date => {
+      const day = byDate[date];
+      const slotIds = new Set(day.slots.map(s => s.id));
+      const extra = d.bookings.filter(b => b.date === date && !slotIds.has(b.slotId))
+        .map(b => ({ id: b.slotId, start: b.time.split('–')[0], open: false }));
+      const rows = [...day.slots, ...extra.filter((s, i, a) => a.findIndex(x => x.id === s.id) === i)].sort((a, b) => a.id < b.id ? -1 : 1);
+      const n = d.bookings.filter(b => b.date === date && counted(b) && groups.indexOf(b.group) !== -1).length;
+      const cells = rows.map(s => `<div class="grid-row" style="--cols:${groups.length}">
+          <div class="t">${esc(s.start)}</div>
+          ${groups.map(g => cell(people[s.id + '|' + g], s)).join('')}
+        </div>`).join('');
+      return `<section class="day${date === today ? ' today' : ''}">
+        <div class="day-head"><h3>${esc(date.slice(5).replace('-', '/'))}<span>星期${esc(day.weekday)}${date === today ? ' · 今天' : ''}</span></h3><span class="count">${n} 人</span></div>
+        <div class="grid">
+          <div class="grid-row hdr" style="--cols:${groups.length}"><div>TIME</div>${groups.map(g => `<div>GROUP ${esc(g)}</div>`).join('')}</div>
+          ${cells}
+        </div>
+      </section>`;
+    }).join('');
+  }
+
+  function cell(list, slot) {
+    if (!list || !list.length) return `<div class="cell${slot.open ? '' : ' closed'}">${slot.open ? '空' : '未開放'}</div>`;
+    const b = list[0];
+    const more = list.length > 1 ? `<span class="more">另有 ${list.length - 1} 筆已取消／未到</span>` : '';
+    return `<button type="button" class="cell st-${esc(b.status)}" data-id="${esc(b.id)}">
+      <span class="who"><span class="nm">${esc(b.name)}</span><span class="chip s-${esc(b.status)}">${esc(b.status)}</span></span>
+      <span class="sid">${esc(b.studentId)}</span>${sv(b)}${more}
+    </button>`;
+  }
+
+  function filtered(d) {
+    const q = state.q.trim().toLowerCase();
+    return d.bookings.filter(b =>
+      (state.group === 'all' || b.group === state.group) &&
+      (state.status === 'all' || (state.status === 'active' ? b.status !== '取消' : b.status === state.status)) &&
+      (!q || [b.name, b.studentId, b.id, b.phone, b.email, b.dept].some(v => String(v).toLowerCase().includes(q)))
+    ).sort(byTime);
+  }
+
+  function renderList(d) {
+    const list = filtered(d);
+    if (!list.length) { $('view').innerHTML = '<div class="empty">沒有符合條件的報名。</div>'; return; }
+    $('view').innerHTML = `<p class="count" style="margin:0 0 10px">${list.length} 筆</p><div class="table-wrap"><table>
+      <thead><tr><th>時間</th><th>組</th><th>姓名</th><th>學號</th><th>系級</th><th>手機</th><th>狀態</th><th>問卷</th><th>備註</th></tr></thead>
+      <tbody>${list.map(b => `<tr data-id="${esc(b.id)}" class="${b.status === '取消' ? 'cancelled' : ''}">
+        <td>${esc(slotLabel(b))}（${esc(weekdayOf(b.date))}）</td><td><span class="g">${esc(b.group)}</span></td>
+        <td>${esc(b.name)}</td><td>${esc(b.studentId)}</td><td>${esc(b.dept)}</td><td>${esc(b.phone)}</td>
+        <td><span class="chip s-${esc(b.status)}">${esc(b.status)}</span></td><td>${sv(b)}</td><td class="note">${esc(b.note)}</td>
+      </tr>`).join('')}</tbody></table></div>`;
+  }
+
+  // ---------- 篩選 ----------
+  $('viewSeg').addEventListener('click', e => {
+    const v = e.target.closest('button')?.dataset.view; if (!v) return;
+    state.view = v;
+    [...$('viewSeg').children].forEach(b => b.setAttribute('aria-pressed', b.dataset.view === v));
+    render();
+  });
+  $('groupSeg').addEventListener('click', e => {
+    const g = e.target.closest('button')?.dataset.group; if (!g) return;
+    state.group = g; render();
+  });
+  $('showPast').addEventListener('change', e => { state.showPast = e.target.checked; render(); });
+  $('hideEmpty').addEventListener('change', e => { state.hideEmpty = e.target.checked; render(); });
+  $('q').addEventListener('input', e => { state.q = e.target.value; render(); });
+  $('statusFilter').addEventListener('change', e => { state.status = e.target.value; render(); });
+  $('view').addEventListener('click', e => {
+    const el = e.target.closest('[data-id]'); if (el) openPanel(el.dataset.id);
+  });
+
+  // ---------- 詳細資料 ----------
+  const findBooking = id => state.data.bookings.find(b => b.id === id);
+
+  function openPanel(id) {
+    state.openId = id;
+    $('pMsg').textContent = ''; $('pSaved').textContent = '';
+    const b = findBooking(id); $('pNote').value = b ? b.note : '';
+    fillPanel();
+    $('scrim').hidden = false; $('panel').hidden = false;
+    $('close').focus();
+  }
+  function closePanel() { state.openId = null; $('scrim').hidden = true; $('panel').hidden = true; }
+
+  function fillPanel() {
+    const b = findBooking(state.openId); if (!b) return closePanel();
+    $('pId').textContent = b.id;
+    $('pName').textContent = b.name;
+    const rows = [
+      ['GROUP', `${b.group} 組${b.staff ? '（' + b.staff + '）' : ''}`],
+      ['TIME', `${b.date}（${weekdayOf(b.date)}）${b.time}`],
+      ['學號', b.studentId], ['系級', b.dept], ['EMAIL', b.email], ['手機', b.phone], ['報名時間', b.createdAt],
+      ['基本資料表', b.basicAt ? `已填（${b.basicAt}）` : '未填'], ['研究問卷', b.postAt ? `已填（${b.postAt}）` : '未填'],
+    ];
+    $('pInfo').innerHTML = rows.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('');
+    $('pStatus').innerHTML = state.data.config.statuses.map(s => `<button type="button" data-s="${esc(s)}" aria-pressed="${b.status === s}">${esc(s)}</button>`).join('');
+  }
+
+  async function update(patch) {
+    const b = findBooking(state.openId); if (!b) return;
+    $('pMsg').textContent = ''; $('pSaved').textContent = '儲存中…';
+    const btns = [...$('pStatus').children, $('saveNote')]; btns.forEach(x => x.disabled = true);
+    try {
+      const r = await api({ action: 'adminUpdate', key: state.key, id: b.id, ...patch });
+      if (!r.ok) {
+        $('pSaved').textContent = '';
+        if (r.auth) { closePanel(); return showLogin(r.message); }
+        $('pMsg').textContent = r.message || '儲存失敗'; return;
+      }
+      b.status = r.status; b.note = r.note;
+      $('pSaved').textContent = '已儲存';
+      render();
+    } catch (e) {
+      $('pSaved').textContent = ''; $('pMsg').textContent = '連線失敗，沒有儲存。請再試一次。';
+    } finally {
+      btns.forEach(x => x.disabled = false);
+    }
+  }
+
+  $('pStatus').addEventListener('click', e => {
+    const s = e.target.closest('button')?.dataset.s; if (!s) return;
+    const b = findBooking(state.openId); if (!b || b.status === s) return;
+    update({ status: s });
+  });
+  $('saveNote').addEventListener('click', () => update({ note: $('pNote').value }));
+  $('close').addEventListener('click', closePanel);
+  $('scrim').addEventListener('click', closePanel);
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('panel').hidden) closePanel(); });
+
+  // ---------- CSV ----------
+  $('csv').addEventListener('click', () => {
+    const d = state.data; if (!d) return;
+    const head = ['報名時間', '報名編號', '姓名', '學號', '系級', 'Email', '電話', '日期', '時間', '組別', '狀態', '備註', '負責助教', '基本資料表', '研究問卷'];
+    // 開頭是 = + - @ 的內容加上 '，避免 Excel 當成公式執行
+    const cellCsv = v => { let s = String(v == null ? '' : v); if (/^[=+\-@]/.test(s)) s = "'" + s; return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+    const lines = [head, ...[...d.bookings].sort(byTime).map(b => [b.createdAt, b.id, b.name, b.studentId, b.dept, b.email, b.phone, b.date, b.time, b.group, b.status, b.note, b.staff, b.basicAt ? '已填' : '未填', b.postAt ? '已填' : '未填'])];
+    const blob = new Blob(['﻿' + lines.map(r => r.map(cellCsv).join(',')).join('\r\n')], { type: 'text/csv;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob); a.download = `施測名單_${today}.csv`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  });
+
+  // ---------- 預覽模式範例資料 ----------
+  let sample = null;
+  function previewApi(body) {
+    if (!sample) sample = makeSample();
+    return new Promise(res => setTimeout(() => {
+      if (body.action === 'admin') return res({ ok: true, ...JSON.parse(JSON.stringify(sample)), generatedAt: new Date().toISOString().replace('T', ' ').slice(0, 19) });
+      const b = sample.bookings.find(x => x.id === body.id);
+      if (!b) return res({ ok: false, message: '找不到這筆報名。' });
+      if (body.status != null) {
+        if (FREE.includes(b.status) && !FREE.includes(body.status) &&
+            sample.bookings.some(x => x !== b && x.slotId === b.slotId && x.group === b.group && !FREE.includes(x.status)))
+          return res({ ok: false, message: `這個時段的 ${b.group} 組已經有其他人，無法恢復。` });
+        b.status = body.status;
+      }
+      if (body.note != null) b.note = body.note;
+      res({ ok: true, id: b.id, status: b.status, note: b.note });
+    }, 250));
+  }
+
+  function makeSample() {
+    let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+    const pick = a => a[Math.floor(rnd() * a.length)];
+    const sur = '陳林黃張李王吳劉蔡楊許鄭謝郭洪曾邱廖賴周';
+    const giv = ['宜庭', '冠宇', '品妤', '承恩', '欣妤', '柏翰', '子晴', '彥廷', '詩涵', '宥辰', '思妤', '家豪', '雅筑', '俊宏', '佳穎', '昱翔'];
+    const depts = ['商業設計管理系 四技二甲', '資訊管理系 四技三乙', '企業管理系 四技一甲', '數位多媒體設計系 四技二乙', '財務金融系 四技三甲'];
+    const slots = [], bookings = [];
+    const d = new Date('2026-11-11T12:00:00+08:00'), end = new Date('2026-12-31T12:00:00+08:00');
+    for (; d <= end; d.setDate(d.getDate() + 1)) {
+      const wd = d.getDay(); if (wd !== 3 && wd !== 4) continue;
+      const date = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Taipei' }).format(d);
+      [9, 10, 11, 13, 14, 15, 16].forEach(h => {
+        const st = String(h).padStart(2, '0') + ':00', en = String(h + 1).padStart(2, '0') + ':00';
+        slots.push({ id: `${date}_${st}`, date, weekday: '日一二三四五六'[wd], start: st, end: en, open: !(date === '2026-11-26' && h >= 13) });
+      });
+    }
+    const staff = { A: '洪莉綺', B: '柯承翰', C: '過立柔' };
+    const ids = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    let k = 0;
+    slots.slice(0, 42).forEach(s => ['A', 'B', 'C'].forEach(g => {
+      if (!s.open || rnd() < 0.45) return;
+      k++;
+      const sid = '113' + pick('1234') + 'B' + String(Math.floor(rnd() * 900) + 100);
+      bookings.push({
+        createdAt: `2026-11-0${1 + (k % 4)} ${String(9 + (k % 12)).padStart(2, '0')}:${String(k * 7 % 60).padStart(2, '0')}:00`,
+        id: Array.from({ length: 6 }, () => pick(ids)).join(''), name: pick(sur) + pick(giv), studentId: sid,
+        dept: pick(depts), email: sid + '@ntub.edu.tw', phone: '09' + String(Math.floor(rnd() * 1e8)).padStart(8, '0').replace(/(\d{2})(\d{3})(\d{3})/, '$1-$2-$3'),
+        slotId: s.id, date: s.date, time: `${s.start}–${s.end}`, group: g, status: '已報名', note: '', staff: staff[g],
+      });
+    }));
+    bookings[3].status = '取消'; bookings[3].note = '受測者來信取消';
+    bookings[8].note = '需要提前 10 分鐘到場';
+    bookings.forEach((b, i) => { if (i % 3 !== 2) b.basicAt = '2026-11-11 09:05:00'; if (i % 3 === 0) b.postAt = '2026-11-11 09:55:00'; });
+    return { config: { title: '研究施測報名', groups: ['A', 'B', 'C'], cap: 30, statuses: ['已報名', '已完成', '未到', '取消'], staff, sheetUrl: '' }, slots, bookings };
+  }
+
+  // ---------- 啟動 ----------
+  $('previewNote').hidden = !PREVIEW;
+  const saved = recall('adminKey');
+  if (saved) { state.key = saved; $('login').hidden = true; $('app').hidden = false; load(); }
+  else $('pw').focus();
+</script>
+<script src="menu.js"></script>
+</body>
+</html>
