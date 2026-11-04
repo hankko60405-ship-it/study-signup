@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>研究問卷</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,200..700&family=Noto+Sans+TC:wght@300;400;500;700&display=swap">
+<style>
+  /* 台北黑體：fonts 資料夾裡的檔案只含本頁用到的字，修改文字後缺的字會改用備用字體 */
+  @font-face {
+    font-family: "Taipei Sans TC";
+    src: local("Taipei Sans TC Beta"), local("TaipeiSansTCBeta-Regular"), url("fonts/TaipeiSansTC-Regular.woff2") format("woff2");
+    font-weight: 400; font-display: swap;
+  }
+  @font-face {
+    font-family: "Taipei Sans TC";
+    src: local("Taipei Sans TC Beta Bold"), local("TaipeiSansTCBeta-Bold"), url("fonts/TaipeiSansTC-Bold.woff2") format("woff2");
+    font-weight: 700; font-display: swap;
+  }
+  /* 版面：手機優先，一次一個步驟（同意 → 時段 → 資料；組別由系統隨機分派），底部固定「上一步／下一步」；
+     電腦版左側多一條直排大字。冷灰底、白色圓角卡片、大號細字數字。 */
+  :root {
+    --bg: #e9ebee;
+    --surface: #ffffff;
+    --ink: #111315;
+    --muted: #6b7178;
+    --faint: #a9aeb4;
+    --line: #d6d9dd;
+    --chip: #f2f3f5;
+    --inverse-bg: #111315;
+    --inverse-ink: #ffffff;
+    --danger: #c2412d;
+    --display: "Archivo", "Noto Sans TC", system-ui, sans-serif;
+    --body: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", system-ui, sans-serif;
+    --small: "Taipei Sans TC", "Noto Sans TC", "PingFang TC", system-ui, sans-serif; /* 小字標籤 */
+    --radius: 18px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0c0d0e; --surface: #17191b; --ink: #f1f2f3; --muted: #9298a0; --faint: #5a6068;
+      --line: #2a2d31; --chip: #212427; --inverse-bg: #f1f2f3; --inverse-ink: #0c0d0e; --danger: #f08a74;
+      color-scheme: dark;
+    }
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body { margin: 0; }
+  body { background: var(--bg); color: var(--ink); font: 15px/1.7 var(--body); -webkit-font-smoothing: antialiased; }
+
+  .shell { display: grid; grid-template-columns: 88px minmax(0, 1fr); min-height: 100vh; }
+
+  /* 左側直排標題列（電腦版） */
+  .rail {
+    position: sticky; top: 0; height: 100vh; border-right: 1px solid var(--line);
+    display: flex; flex-direction: column; justify-content: space-between; align-items: center; padding: 24px 0;
+  }
+  .rail .word {
+    writing-mode: vertical-rl; /* 中文直排，字保持正向、由上往下讀 */
+    font: 300 46px/1 var(--body); letter-spacing: .12em; white-space: nowrap;
+  }
+  .rail .word b { font-weight: 700; }
+  .rail .tag { font: 400 10px/1 var(--small); letter-spacing: .14em; color: var(--muted); writing-mode: vertical-rl; transform: rotate(180deg); }
+
+  .content { min-width: 0; padding: 0 max(16px, 4vw) 120px; max-width: 980px; }
+
+  /* 頂部：狀態 + 進度 */
+  .topbar {
+    display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: center; justify-content: space-between;
+    padding: 20px 0; border-bottom: 1px solid var(--line);
+    font: 400 11px/1 var(--small); letter-spacing: .12em; color: var(--muted);
+  }
+  .status { display: inline-flex; align-items: center; gap: 8px; }
+  .status::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: #3fae7a; flex: none; }
+  .status.preview { color: var(--ink); letter-spacing: .04em; }
+  .status.preview::before { background: #e0a526; }
+  .progress { display: flex; gap: 6px; }
+  .progress > span { padding: 8px 12px; border-radius: 999px; white-space: nowrap; }
+  .progress > span.on { background: var(--inverse-bg); color: var(--inverse-ink); }
+  .progress > span.done { color: var(--ink); }
+
+  /* 主標（只在第一步顯示） */
+  .hero { position: relative; padding: 56px 0 40px; overflow: hidden; }
+  .hero svg { position: absolute; right: -80px; top: -40px; width: 440px; height: 440px; color: var(--faint); pointer-events: none; }
+  .eyebrow { font: 400 11px/1 var(--small); letter-spacing: .16em; color: var(--muted); text-transform: uppercase; }
+  .hero h1 { position: relative; margin: 16px 0 20px; font: 300 clamp(40px, 7vw, 80px)/1.05 var(--body); letter-spacing: -.02em; text-wrap: balance; }
+  .meta { position: relative; display: flex; flex-wrap: wrap; gap: 8px; }
+  .pill {
+    display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 999px;
+    background: var(--surface); border: 1px solid var(--line); font: 400 12px/1 var(--small); letter-spacing: .06em;
+  }
+
+  /* 步驟卡片 */
+  .card {
+    margin-top: 24px; background: var(--surface); border-radius: var(--radius); padding: clamp(20px, 3vw, 32px);
+    display: grid; grid-template-columns: 140px minmax(0, 1fr); gap: 24px;
+  }
+  .num { font: 200 72px/.9 var(--display); font-stretch: 110%; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
+  .num small { display: block; margin-top: 12px; font: 400 10px/1.4 var(--small); letter-spacing: .14em; color: var(--muted); text-transform: uppercase; }
+  .card-body { min-width: 0; display: flex; flex-direction: column; gap: 16px; }
+  .card h2 { margin: 0; font: 500 20px/1.3 var(--body); }
+  .hint { margin: -8px 0 0; color: var(--muted); font-size: 14px; }
+
+  .consent-text { max-height: 46vh; overflow-y: auto; padding: 16px 18px; border-radius: 12px; background: var(--chip); color: var(--muted); font-size: 14px; }
+  .consent-text p { margin: 0 0 8px; }
+  .consent-text p:last-child { margin: 0; }
+  .consent-text .doc-title { font-weight: 700; color: var(--ink); font-size: 15px; }
+  .consent-text h3 { margin: 16px 0 6px; font: 700 13px/1.4 var(--body); color: var(--ink); letter-spacing: .04em; }
+  .consent-text ul { margin: 0 0 8px; padding-left: 1.2em; }
+  .consent-text li { margin-bottom: 4px; }
+  .doc-link { align-self: flex-start; display: inline-flex; gap: 6px; align-items: center; padding: 8px 14px; border-radius: 999px; border: 1px solid var(--line); color: var(--ink); text-decoration: none; font: 400 12px/1 var(--small); letter-spacing: .06em; }
+  .doc-link:hover { border-color: var(--ink); }
+  .check { display: flex; gap: 12px; align-items: center; cursor: pointer; padding: 4px 0; }
+  .check input { appearance: none; width: 22px; height: 22px; margin: 0; border: 1.5px solid var(--faint); border-radius: 6px; display: grid; place-items: center; flex: none; cursor: pointer; }
+  .check input:checked { background: var(--inverse-bg); border-color: var(--inverse-bg); }
+  .check input:checked::after { content: "✓"; color: var(--inverse-ink); font-size: 14px; line-height: 1; }
+
+  /* 組別卡 */
+  .groups { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+  .group {
+    font: inherit; color: var(--ink); text-align: left; cursor: pointer;
+    border: 1px solid var(--line); border-radius: 16px; background: var(--surface);
+    padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 6px; min-height: 168px;
+  }
+  .group .tagline { display: flex; justify-content: space-between; align-items: center; font: 400 10px/1 var(--small); letter-spacing: .14em; color: var(--muted); }
+  .group .letter { font: 200 96px/1 var(--display); font-stretch: 112%; margin-top: auto; }
+  .group .left { font: 400 12px/1 var(--small); letter-spacing: .06em; color: var(--muted); }
+  .group:hover:not(:disabled) { border-color: var(--ink); }
+  .group[aria-pressed="true"] { background: var(--inverse-bg); color: var(--inverse-ink); border-color: var(--inverse-bg); }
+  .group[aria-pressed="true"] .tagline, .group[aria-pressed="true"] .left { color: var(--inverse-ink); opacity: .7; }
+  .group:disabled, .slot:disabled {
+    cursor: not-allowed; color: var(--faint);
+    background: repeating-linear-gradient(135deg, transparent 0 7px, var(--chip) 7px 8px), var(--surface);
+  }
+  .box { width: 14px; height: 14px; border: 1.5px solid var(--faint); border-radius: 4px; }
+  [aria-pressed="true"] .box { background: var(--inverse-ink); border-color: var(--inverse-ink); display: grid; place-items: center; }
+  [aria-pressed="true"] .box::after { content: "✓"; color: var(--inverse-bg); font-size: 10px; line-height: 1; }
+
+  /* 日期切換 */
+  .dates { display: flex; gap: 4px; padding: 4px; border-radius: 999px; background: var(--chip); overflow-x: auto; max-width: 100%; align-self: flex-start; scrollbar-width: none; }
+  .dates::-webkit-scrollbar { display: none; }
+  .date-btn { font: 500 13px/1 var(--body); padding: 10px 16px; border: 0; border-radius: 999px; background: transparent; color: var(--muted); cursor: pointer; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .date-btn[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px rgb(0 0 0 / .08); }
+  .date-btn:disabled { opacity: .4; cursor: not-allowed; }
+
+  /* 時段卡 */
+  .times { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
+  .slot { text-align: left; cursor: pointer; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); color: var(--ink); padding: 12px 14px 14px; display: flex; flex-direction: column; gap: 10px; font: inherit; }
+  .slot-top, .slot-foot { display: flex; justify-content: space-between; align-items: center; font: 400 11px/1 var(--small); color: var(--muted); letter-spacing: .06em; }
+  .slot-time { font: 300 34px/1 var(--display); font-stretch: 105%; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+  .slot:hover:not(:disabled) { border-color: var(--ink); }
+  .slot[aria-pressed="true"] { background: var(--inverse-bg); color: var(--inverse-ink); border-color: var(--inverse-bg); }
+  .slot[aria-pressed="true"] .slot-top, .slot[aria-pressed="true"] .slot-foot { color: var(--inverse-ink); opacity: .7; }
+  .slot:disabled .slot-time { text-decoration: line-through; text-decoration-thickness: 1px; }
+
+  /* 表單 */
+  .fields { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .fields .full { grid-column: 1 / -1; }
+  .field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .field span { font: 400 10px/1 var(--small); letter-spacing: .14em; color: var(--muted); text-transform: uppercase; }
+  .field input { font: 400 16px/1.4 var(--body); padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--chip); color: var(--ink); width: 100%; }
+  .field input:focus, .field select:focus { background: var(--surface); }
+  .field select {
+    font: 400 16px/1.4 var(--body); padding: 12px 40px 12px 14px; border: 1px solid var(--line); border-radius: 12px;
+    background: var(--chip); color: var(--ink); width: 100%; appearance: none; -webkit-appearance: none; cursor: pointer;
+  }
+  .field select:invalid { color: var(--faint); }
+  .field option { color: var(--ink); }
+  .select-wrap { position: relative; }
+  .select-wrap::after { content: "▾"; position: absolute; right: 14px; top: 50%; transform: translateY(-50%); color: var(--muted); pointer-events: none; font-size: 13px; }
+  .eligibility { margin: 0; padding: 14px 16px; border-radius: 12px; border: 1px solid var(--line); display: grid; gap: 6px; font-size: 14px; }
+  .eligibility ul { margin: 0; padding-left: 1.2em; color: var(--muted); }
+  .recap { display: grid; grid-template-columns: max-content 1fr; gap: 6px 20px; padding: 14px 16px; border-radius: 12px; background: var(--chip); margin: 0; }
+  .recap dt, .complete dt { font: 400 10px/2.2 var(--small); letter-spacing: .14em; color: var(--muted); text-transform: uppercase; }
+  .recap dd, .complete dd { margin: 0; font-variant-numeric: tabular-nums; }
+  .msg { margin: 0; color: var(--danger); font-size: 14px; }
+  .msg:empty { display: none; }
+  .muted { color: var(--muted); font-size: 14px; margin: 0; }
+
+  /* 底部操作列 */
+  .actions {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 5;
+    display: flex; gap: 10px; justify-content: flex-end; align-items: center;
+    padding: 12px max(16px, env(safe-area-inset-right, 0px)) calc(12px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
+    background: color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    border-top: 1px solid var(--line);
+  }
+  .back { width: 48px; height: 48px; flex: none; border-radius: 50%; border: 1px solid var(--line); background: var(--surface); color: var(--ink); font-size: 18px; cursor: pointer; }
+  .primary {
+    display: inline-flex; align-items: center; justify-content: space-between; gap: 12px; min-width: 200px;
+    padding: 6px 6px 6px 22px; border: 0; border-radius: 999px;
+    background: var(--inverse-bg); color: var(--inverse-ink); font: 500 15px/1 var(--body); cursor: pointer;
+  }
+  .primary .arrow { width: 36px; height: 36px; border-radius: 50%; background: var(--inverse-ink); color: var(--inverse-bg); display: grid; place-items: center; font-size: 16px; }
+  .primary:disabled { opacity: .35; cursor: not-allowed; }
+
+  /* 完成畫面 */
+  .complete { margin-top: 24px; background: var(--surface); border-radius: var(--radius); padding: clamp(24px, 4vw, 48px); display: flex; flex-direction: column; gap: 24px; }
+  .code { font: 200 clamp(56px, 14vw, 128px)/.9 var(--display); font-stretch: 112%; letter-spacing: .02em; word-break: break-all; }
+  .complete dl { display: grid; grid-template-columns: max-content 1fr; gap: 10px 24px; margin: 0; }
+  .notice { padding: 14px 18px; border-radius: 12px; background: var(--chip); font-size: 14px; margin: 0; }
+
+  :focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+  @media (prefers-reduced-motion: no-preference) {
+    .slot, .group, .date-btn, .primary { transition: background .15s, color .15s, border-color .15s, opacity .15s; }
+    .card { animation: rise .25s ease-out; }
+    @keyframes rise { from { transform: translateY(8px); } to { transform: none; } }
+  }
+
+  /* 手機 */
+  @media (max-width: 760px) {
+    .shell { grid-template-columns: 1fr; }
+    .rail { position: static; height: auto; flex-direction: row; padding: 14px max(16px, 4vw); border-right: 0; border-bottom: 1px solid var(--line); }
+    .rail .word { writing-mode: horizontal-tb; font-size: 22px; letter-spacing: .08em; }
+    .rail .tag { writing-mode: horizontal-tb; transform: none; }
+    .topbar { padding: 14px 0; }
+    .progress > span { padding: 6px 9px; }
+    .progress > span:not(.on) .lbl { display: none; }
+    .hero { padding: 32px 0 8px; }
+    .hero svg { width: 280px; height: 280px; right: -120px; top: -30px; }
+    .card { grid-template-columns: 1fr; gap: 12px; margin-top: 16px; }
+    .num { font-size: 48px; display: flex; align-items: baseline; gap: 12px; }
+    .num small { margin: 0; }
+    .group { min-height: 136px; padding: 12px; }
+    .group .letter { font-size: 72px; }
+    .fields { grid-template-columns: 1fr; }
+    .times { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .primary { flex: 1; min-width: 0; }
+  }
+
+  /* ---------- 問卷頁（survey.html）專用 ---------- */
+  .code-input { font: 300 34px/1.2 var(--display) !important; letter-spacing: .12em; text-transform: uppercase; max-width: 320px; }
+  #form { display: flex; flex-direction: column; gap: 12px; }
+  .q { margin: 0; padding: 16px; border: 1px solid var(--line); border-radius: 14px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+  .q.missing { border-color: var(--danger); box-shadow: inset 0 0 0 1px var(--danger); }
+  .q-label { padding: 0; font: 500 15px/1.5 var(--body); color: var(--ink); display: flex; gap: 10px; }
+  fieldset.q { display: block; }
+  fieldset.q > legend { float: left; width: 100%; margin-bottom: 12px; } /* 讓題目文字在框內，而不是壓在框線上 */
+  fieldset.q > legend + * { clear: both; }
+  fieldset.q > * + .ends, fieldset.q > .chips + .other { margin-top: 10px; }
+  .q-no { flex: none; width: 24px; height: 24px; border-radius: 50%; background: var(--chip); display: grid; place-items: center; font: 400 12px/1 var(--display); color: var(--muted); margin-top: 1px; }
+  .q-section { margin: 14px 0 0; font: 700 14px/1.4 var(--body); letter-spacing: .04em; }
+  .q-section:first-child { margin-top: 0; }
+  .q-num { display: flex; align-items: center; gap: 10px; }
+  .q-num input, .q .other { font: 400 16px/1.4 var(--body); padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--chip); color: var(--ink); width: 120px; }
+  .q .other { width: 100%; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip, .pt { position: relative; cursor: pointer; }
+  .chip input, .pt input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+  .chip span { display: inline-block; padding: 10px 16px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); font-size: 14px; }
+  .chip input:checked + span, .pt input:checked + span { background: var(--inverse-bg); color: var(--inverse-ink); border-color: var(--inverse-bg); }
+  .chip input:focus-visible + span, .pt input:focus-visible + span { outline: 2px solid var(--ink); outline-offset: 2px; }
+  .scale { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
+  .pt span { display: grid; place-items: center; height: 46px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface); font: 300 20px/1 var(--display); font-variant-numeric: tabular-nums; }
+  .pt:hover span, .chip:hover span { border-color: var(--ink); }
+  .ends { display: flex; justify-content: space-between; font: 400 11px/1.3 var(--small); color: var(--muted); letter-spacing: .04em; }
+  .answered { margin-right: auto; font: 300 20px/1 var(--display); font-variant-numeric: tabular-nums; color: var(--muted); padding-left: 4px; }
+</style>
+</head>
+<body data-page="basic">
+<div class="shell">
+  <aside class="rail">
+    <div class="tag">MENU</div>
+    <div class="word" aria-hidden="true"><b>創意發想</b>研究</div>
+    <div class="tag" id="railStep">STEP 01</div>
+  </aside>
+
+  <div class="content">
+    <div class="topbar">
+      <span class="status" id="status">問卷填寫中</span>
+      <div class="progress" id="progress" aria-hidden="true">
+        <span>01<span class="lbl"> 報名編號</span></span><span>02<span class="lbl"> 填答</span></span>
+      </div>
+    </div>
+
+    <header class="hero" id="hero">
+      <div class="eyebrow" id="eyebrow">Basic information · 施測前填寫</div>
+      <h1 id="title">基本資料表</h1>
+      <div class="meta" id="meta"></div>
+    </header>
+
+    <main id="survey">
+      <!-- 步驟 1：報名編號 -->
+      <section class="card" data-step="1">
+        <div class="num">01<small>Booking code</small></div>
+        <div class="card-body">
+          <h2>輸入報名編號</h2>
+          <p class="hint">報名完成時畫面上的 6 碼編號，也寫在確認信裡。不知道的話請詢問現場研究人員。</p>
+          <label class="field"><span>報名編號 Booking code</span>
+            <input type="text" id="code" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="10" placeholder="例：8GX222" class="code-input"></label>
+          <p class="muted" id="intro"></p>
+        </div>
+      </section>
+
+      <!-- 步驟 2：填答 -->
+      <section class="card" data-step="2" hidden>
+        <div class="num">02<small>Questions</small></div>
+        <div class="card-body">
+          <dl class="recap"><dt>Code</dt><dd id="rCode"></dd><dt>Time</dt><dd id="rTime"></dd></dl>
+          <p class="hint" id="qHint"></p>
+          <form id="form" novalidate></form>
+        </div>
+      </section>
+
+      <p class="msg" id="msg" role="alert" style="margin-top:16px"></p>
+    </main>
+
+    <section class="complete" id="done" hidden>
+      <div class="eyebrow">Submitted · 填寫完成</div>
+      <div class="code" id="dTitle" style="font-size:clamp(40px,9vw,84px)"></div>
+      <p class="notice" id="dText"></p>
+    </section>
+  </div>
+</div>
+
+<div class="actions" id="actions">
+  <button class="back" id="back" type="button" aria-label="上一步" hidden>←</button>
+  <span class="answered" id="answered"></span>
+  <button class="primary" id="next" type="button"><span id="nextLabel">下一步</span><span class="arrow" aria-hidden="true">↗</span></button>
+</div>
+
+<script>
+  // 與 index.html 相同的 Apps Script 網址
+  const API_URL = 'https://script.google.com/macros/s/AKfycbzF0l-VlVxytK2UXsmRA2xX2BnW_RWkS8FmfwqrzcTRvi0psJjKTy2g24c-dVKXHwDI/exec';
+  const PREVIEW = !/^https:\/\/script\.google\.com\/.+\/exec$/.test(API_URL) || API_URL.includes('請貼上');
+
+  // ---------- 題目（附件2-3 基本資料表、研究問卷及施測說明，2026/07/31 Version01）----------
+  // 選項文字要和 Code.gs 的 SURVEYS 一致
+  const LIKERT_LABELS = ['非常不同意', '不同意', '普通', '同意', '非常同意'];
+  const FORMS = {
+    basic: {
+      title: '基本資料表', eyebrow: 'Basic information · 施測前填寫', meta: ['創意任務開始前填寫', '約 2 分鐘'],
+      intro: '基本資料表於創意發想任務開始前填寫，內容包括您的基本背景資料及相關經驗。',
+      hint: '請依您的實際情況填答，每一題都需要回答。',
+      done: '基本資料表已送出，謝謝您。請依現場研究人員指示開始創意任務。',
+      sections: [{ items: [
+        { key: 'age', label: '年齡', type: 'number', unit: '歲' },
+        { key: 'gender', label: '性別', type: 'choice', options: ['女性', '男性', '其他', '不願回答'], other: 'genderOther' },
+        { key: 'grade', label: '目前就讀年級', type: 'choice', options: ['大一', '大二', '大三', '大四', '其他'], other: 'gradeOther' },
+        { key: 'designExp', label: '設計或創意相關經驗', type: 'choice', options: ['無', '未滿1年', '1–2年', '2年以上'] },
+        { key: 'aiExp', label: '生成式AI使用經驗', type: 'choice', options: ['從未使用', '未滿6個月', '6–12個月', '1年以上'] },
+        { key: 'aiFreq', label: '生成式AI使用頻率', type: 'choice', options: ['從不', '很少', '偶爾', '經常', '非常經常'] },
+        { key: 'aiFamiliar', label: '生成式AI操作熟悉程度', type: 'scale', ends: ['非常不熟悉', '非常熟悉'] },
+      ] }],
+    },
+    post: {
+      title: '研究問卷', eyebrow: 'Questionnaire · 施測後填寫', meta: ['創意任務完成後立即填寫', '18 題', '約 5 分鐘'],
+      intro: '研究問卷於創意發想任務完成後立即填寫，包含認知投入、認知負荷與心智努力，以及創意任務焦慮三個部分。',
+      hint: '請依據您剛完成創意發想任務時的實際感受，選擇最符合的答案。1＝非常不同意、2＝不同意、3＝普通、4＝同意、5＝非常同意。',
+      done: '研究問卷已送出，感謝您的參與！施測內容請勿與他人討論或分享，結束後也請保密。',
+      sections: [
+        { title: '（一）認知投入', prefix: 'e', items: [
+          '我在創意任務過程中保持高度專注。',
+          '我全程積極參與創意構想的形成與發展。',
+          '我在任務過程中持續思考，沒有輕易中斷。',
+          '我主動探索不同的想法或可能方向。',
+          '即使遇到困難，我仍持續嘗試完成任務。',
+          '我主動組織、比較並修正自己的創意想法。'] },
+        { title: '（二）認知負荷與心智努力', prefix: 'l', items: [
+          '剛才的創意任務對我的心智要求很高。',
+          '我在任務過程中需要同時處理許多資訊。',
+          '我在完成任務時感受到時間壓力。',
+          '為了完成任務，我付出了很多心智努力。',
+          '我在任務過程中感到挫折或煩躁。',
+          '整體而言，我覺得剛才的任務負擔很重。'] },
+        { title: '（三）創意任務焦慮', prefix: 'a', items: [
+          '我在創意任務過程中感到緊張。',
+          '我擔心自己無法順利完成創意任務。',
+          '我擔心自己的想法不夠有創意。',
+          '我在任務過程中不確定下一步應如何進行。',
+          '我覺得自己難以掌握創意任務的進行方式。',
+          '我擔心自己的任務表現低於預期。'] },
+      ].map(sec => ({ title: sec.title, items: sec.items.map((text, i) => ({ key: sec.prefix + (i + 1), no: i + 1, label: text, type: 'likert' })) })),
+    },
+  };
+
+  const $ = id => document.getElementById(id);
+  const esc = v => String(v).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const formKey = new URLSearchParams(location.search).get('f') === 'post' ? 'post' : 'basic';
+  const F = FORMS[formKey];
+  const allItems = F.sections.flatMap(s => s.items);
+  const state = { step: 1, code: '', booking: null, answers: {}, sending: false, tried: false };
+  document.body.dataset.page = formKey;
+
+  // ---------- 畫面 ----------
+  document.title = F.title + '｜創意發想研究';
+  $('title').textContent = F.title;
+  $('eyebrow').textContent = F.eyebrow;
+  $('meta').innerHTML = F.meta.map(m => `<span class="pill">${esc(m)}</span>`).join('');
+  $('intro').textContent = F.intro;
+  $('qHint').textContent = F.hint;
+  if (PREVIEW) { $('status').textContent = '預覽模式：尚未連接試算表，填答不會被儲存'; $('status').classList.add('preview'); }
+
+  function buildForm() {
+    const html = F.sections.map(sec => `
+      ${sec.title ? `<h3 class="q-section">${esc(sec.title)}</h3>` : ''}
+      ${sec.items.map(q => {
+        const name = `q_${q.key}`;
+        if (q.type === 'number') return `
+          <div class="q" data-key="${q.key}"><label class="q-label" for="${name}">${esc(q.label)}</label>
+            <div class="q-num"><input id="${name}" type="number" inputmode="numeric" min="18" max="99" step="1" placeholder="例：20"><span>${esc(q.unit)}</span></div></div>`;
+        if (q.type === 'choice') return `
+          <fieldset class="q" data-key="${q.key}"><legend class="q-label">${esc(q.label)}</legend>
+            <div class="chips">${q.options.map(o => `<label class="chip"><input type="radio" name="${name}" value="${esc(o)}"><span>${esc(o)}</span></label>`).join('')}</div>
+            ${q.other ? `<input class="other" id="q_${q.other}" type="text" maxlength="50" placeholder="請說明" hidden>` : ''}</fieldset>`;
+        // scale / likert：1–5
+        const ends = q.type === 'scale' ? q.ends : [LIKERT_LABELS[0], LIKERT_LABELS[4]];
+        return `
+          <fieldset class="q likert" data-key="${q.key}"><legend class="q-label">${q.no ? `<span class="q-no">${q.no}</span>` : ''}${esc(q.label)}</legend>
+            <div class="scale">${[1, 2, 3, 4, 5].map(n => `<label class="pt"><input type="radio" name="${name}" value="${n}" aria-label="${n}${q.type === 'likert' ? ' ' + LIKERT_LABELS[n - 1] : ''}"><span>${n}</span></label>`).join('')}</div>
+            <div class="ends"><span>${esc(ends[0])}</span><span>${esc(ends[1])}</span></div></fieldset>`;
+      }).join('')}`).join('');
+    $('form').innerHTML = html;
+  }
+
+  function readAnswers() {
+    const a = {};
+    allItems.forEach(q => {
+      if (q.type === 'number') a[q.key] = $(`q_${q.key}`).value.trim();
+      else {
+        const c = document.querySelector(`input[name="q_${q.key}"]:checked`);
+        a[q.key] = c ? c.value : '';
+        if (q.other) {
+          const box = $(`q_${q.other}`);
+          box.hidden = a[q.key] !== '其他';
+          a[q.other] = box.hidden ? '' : box.value.trim();
+        }
+      }
+    });
+    return a;
+  }
+
+  const isDone = (q, a) => {
+    if (q.type === 'number') return /^\d{1,3}$/.test(a[q.key]) && +a[q.key] >= 18 && +a[q.key] <= 99;
+    if (!a[q.key]) return false;
+    return !(q.other && a[q.key] === '其他' && !a[q.other]);
+  };
+
+  function render() {
+    document.querySelectorAll('[data-step]').forEach(el => { el.hidden = Number(el.dataset.step) !== state.step; });
+    $('hero').hidden = state.step !== 1;
+    [...$('progress').children].forEach((el, i) => { el.className = i + 1 === state.step ? 'on' : i + 1 < state.step ? 'done' : ''; });
+    $('railStep').textContent = `STEP 0${state.step} / 02`;
+    $('back').hidden = state.step === 1;
+    const a = state.answers = readAnswers();
+    const n = allItems.filter(q => isDone(q, a)).length;
+    $('answered').textContent = state.step === 2 ? `${n} / ${allItems.length}` : '';
+    document.querySelectorAll('.q').forEach(el => {
+      const q = allItems.find(x => x.key === el.dataset.key);
+      el.classList.toggle('missing', state.tried && !isDone(q, a));
+    });
+    $('nextLabel').textContent = state.sending ? (state.step === 1 ? '確認中…' : '送出中…') : state.step === 1 ? '開始填寫' : '送出';
+    $('next').disabled = state.sending || (state.step === 1 && $('code').value.trim().length < 4);
+  }
+
+  // ---------- 資料 ----------
+  async function api(body) {
+    if (PREVIEW) {
+      await new Promise(r => setTimeout(r, 300));
+      return body.action === 'surveyCheck' ? { ok: true, id: body.bookingId.toUpperCase(), date: '2026-11-11', time: '09:00–10:00' } : { ok: true };
+    }
+    const res = await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(body) });
+    return res.json();
+  }
+
+  function go(step) { $('msg').textContent = ''; state.step = step; render(); window.scrollTo(0, 0); }
+
+  $('code').addEventListener('input', () => { $('code').value = $('code').value.toUpperCase().replace(/[^A-Z0-9]/g, ''); render(); });
+  $('code').addEventListener('keydown', e => { if (e.key === 'Enter' && !$('next').disabled) $('next').click(); });
+  $('form').addEventListener('input', render);
+  $('form').addEventListener('change', render);
+  $('back').addEventListener('click', () => go(1));
+
+  $('next').addEventListener('click', async () => {
+    $('msg').textContent = '';
+    if (state.step === 1) {
+      state.sending = true; render();
+      try {
+        const r = await api({ action: 'surveyCheck', form: formKey, bookingId: $('code').value.trim() });
+        if (!r.ok) { $('msg').textContent = r.message; return; }
+        state.booking = r;
+        $('rCode').textContent = r.id;
+        $('rTime').textContent = `${r.date} ${r.time}`;
+        go(2);
+      } catch (e) {
+        $('msg').textContent = '連線失敗，請檢查網路後再試一次。';
+      } finally { state.sending = false; render(); }
+      return;
+    }
+    const a = readAnswers();
+    const missing = allItems.filter(q => !isDone(q, a));
+    if (missing.length) {
+      state.tried = true; render();
+      $('msg').textContent = `還有 ${missing.length} 題沒有填答（已用紅框標示）。`;
+      document.querySelector(`.q[data-key="${missing[0].key}"]`).scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
+    state.sending = true; render();
+    try {
+      const r = await api({ action: 'survey', form: formKey, bookingId: state.booking.id, answers: a });
+      if (!r.ok) {
+        $('msg').textContent = r.message;
+        if (r.field) { const el = document.querySelector(`.q[data-key="${r.field}"]`) || $(`q_${r.field}`); el && el.scrollIntoView({ block: 'center' }); }
+        return;
+      }
+      $('dTitle').textContent = F.title + ' ✓';
+      $('dText').textContent = F.done;
+      $('survey').hidden = true; $('hero').hidden = true; $('actions').hidden = true; $('done').hidden = false;
+      $('railStep').textContent = 'DONE';
+      [...$('progress').children].forEach(el => { el.className = 'done'; });
+      window.scrollTo(0, 0);
+    } catch (e) {
+      $('msg').textContent = '送出失敗，請檢查網路後再試一次。您的填答還在畫面上。';
+    } finally {
+      state.sending = false;
+      if (!$('actions').hidden) render();
+    }
+  });
+
+  buildForm();
+  render();
+</script>
+<script src="menu.js"></script>
+</body>
+</html>
