@@ -486,7 +486,7 @@
       const n = d.bookings.filter(b => b.date === date && counted(b) && groups.indexOf(b.group) !== -1).length;
       const cells = rows.map(s => `<div class="grid-row" style="--cols:${groups.length}">
           <div class="t">${esc(s.start)}</div>
-          ${groups.map(g => cell(people[s.id + '|' + g], s)).join('')}
+          ${groups.map(g => cell(people[s.id + '|' + g], { open: s.open && (!s.groups || s.groups.includes(g)) })).join('')}
         </div>`).join('');
       return `<section class="day${date === today ? ' today' : ''}">
         <div class="day-head"><h3>${esc(date.slice(5).replace('-', '/'))}<span>星期${esc(day.weekday)}${date === today ? ' · 今天' : ''}</span></h3><span class="count">${n} 人</span></div>
