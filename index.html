@@ -598,9 +598,9 @@
   $('eligible').addEventListener('change', render);
   // 年級選項依學制變化（要和 Code.gs 的 PROGRAMS 一致）
   const GRADES_BY_PROGRAM = {
-    '四技': ['一年級', '二年級', '三年級', '四年級', '延修生'],
-    '二技': ['一年級', '二年級', '延修生'],
-    '二專': ['一年級', '二年級', '延修生'],
+    '四技': ['一年級', '二年級', '三年級', '四年級', '延修生', '外籍生'],
+    '二技': ['一年級', '二年級', '延修生', '外籍生'],
+    '二專': ['一年級', '二年級', '延修生', '外籍生'],
   };
   $('program').addEventListener('change', () => {
     const list = GRADES_BY_PROGRAM[$('program').value] || [];
