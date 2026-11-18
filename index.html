@@ -640,6 +640,7 @@
       }
       $('dCode').textContent = res.bookingId;
       $('dName').textContent = res.name;
+      if (res.location) $('dLocation').textContent = res.location; // 各組地點可能不同
       $('dGroup').textContent = `${res.group} 組`;
       $('dTime').textContent = `${res.date}（${res.weekday}）${res.time}`;
       $('booking').hidden = true;
